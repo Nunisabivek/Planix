@@ -3,6 +3,10 @@ import React, { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
+// Ensure this page is not statically prerendered
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
