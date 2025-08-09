@@ -4,14 +4,23 @@
       "ignoreAtRules": ["tailwind", "layer", "base", "components", "utilities", "variants", "responsive", "apply", "screen"]
     }],
     "function-no-unknown": [true, {
-      "ignoreFunctions": ["theme"]
+      "ignoreFunctions": ["theme", "var"]
     }],
     "property-no-unknown": [true, {
       "ignoreProperties": ["font-feature-settings"]
     }],
     "selector-pseudo-class-no-unknown": [true, {
       "ignorePseudoClasses": ["global"]
-    }]
+    }],
+    "declaration-block-trailing-semicolon": null,
+    "no-descending-specificity": null
   },
-  "ignoreFiles": ["**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx"]
+  "ignoreFiles": [
+    "**/*.js", 
+    "**/*.jsx", 
+    "**/*.ts", 
+    "**/*.tsx", 
+    "**/node_modules/**",
+    "**/.next/**"
+  ]
 }
