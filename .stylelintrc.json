@@ -1,0 +1,7 @@
+{
+  "rules": {
+    "at-rule-no-unknown": [true, {
+      "ignoreAtRules": ["tailwind", "base", "components", "utilities", "variants", "responsive", "apply", "screen"]
+    }]
+  }
+}
