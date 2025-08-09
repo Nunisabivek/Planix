@@ -1,0 +1,19 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "ON_FAILURE"
+
+[environments.production]
+variables = { NODE_ENV = "production" }
+
+[[services]]
+name = "backend"
+source = "backend"
+
+[services.backend.build]
+buildCommand = "npm install && npm run build"
+
+[services.backend.deploy]
+startCommand = "npm run start"

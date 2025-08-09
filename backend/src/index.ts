@@ -1,12 +1,14 @@
 
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
-import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
-import Razorpay from 'razorpay';
-import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
-import axios from 'axios';
+const express = require('express');
+const cors = require('cors');
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+
+import { type Express, type Request, type Response, type NextFunction } from 'express';
 
 const prisma = new PrismaClient();
 const app: Express = express();
