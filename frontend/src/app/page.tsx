@@ -3,8 +3,6 @@ import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-export const dynamic = 'force-dynamic';
-
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
   animate: { opacity: 1, y: 0 },

@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-export const dynamic = 'force-dynamic';
+// export const dynamic = 'force-dynamic';
 
 export default function SubscribePage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -44,50 +44,50 @@ export default function SubscribePage() {
       // Create order on backend
       const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
       const orderRes = await fetch(`${api}/api/payment/create-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          amount: 999,
-          currency: 'INR',
+      },
+      body: JSON.stringify({
+        amount: 999,
+        currency: 'INR',
           receipt: `receipt_${Date.now()}`,
           notes: { plan: 'PRO' },
-        }),
-      });
+      }),
+    });
 
       if (!orderRes.ok) {
         throw new Error('Failed to create order');
       }
 
-      const order = await orderRes.json();
+    const order = await orderRes.json();
 
       // Open Razorpay checkout
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'YOUR_KEY_ID',
-        amount: order.amount,
-        currency: order.currency,
-        name: 'Planix Pro',
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'YOUR_KEY_ID',
+      amount: order.amount,
+      currency: order.currency,
+      name: 'Planix Pro',
         description: 'Monthly Pro Subscription',
-        order_id: order.id,
-        handler: async function (response: any) {
+      order_id: order.id,
+      handler: async function (response: any) {
           try {
             // Verify payment on backend
             const verifyRes = await fetch(`${api}/api/payment/verify`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                order_id: response.razorpay_order_id,
-                payment_id: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-              }),
-            });
+          },
+          body: JSON.stringify({
+            order_id: response.razorpay_order_id,
+            payment_id: response.razorpay_payment_id,
+            signature: response.razorpay_signature,
+          }),
+        });
             
-            const verificationData = await verifyRes.json();
+        const verificationData = await verifyRes.json();
             
             if (verifyRes.ok) {
               // Update local user data
@@ -105,23 +105,23 @@ export default function SubscribePage() {
             console.error('Payment verification error:', error);
             alert('Payment verification failed. Please contact support.');
           }
-        },
-        prefill: {
+      },
+      prefill: {
           name: user?.name || 'User',
           email: user?.email || '',
-        },
-        theme: {
+      },
+      theme: {
           color: '#3b82f6',
-        },
+      },
         modal: {
           ondismiss: function() {
             setIsLoading(false);
           }
         }
-      };
+    };
 
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+    const rzp = new window.Razorpay(options);
+    rzp.open();
       
     } catch (error) {
       console.error('Subscription error:', error);
@@ -383,13 +383,13 @@ export default function SubscribePage() {
                     ✓ Active Subscription
                   </div>
                 ) : (
-                  <button 
-                    onClick={handleSubscribe}
+        <button
+          onClick={handleSubscribe}
                     disabled={isLoading}
                     className="btn-secondary w-full bg-white text-purple-600 hover:bg-gray-100"
-                  >
+        >
                     {isLoading ? 'Processing...' : 'Upgrade Now'}
-                  </button>
+        </button>
                 )}
               </div>
             </motion.div>
@@ -472,7 +472,7 @@ export default function SubscribePage() {
             <Link href="/editor" className="hover:text-white transition-colors">Editor</Link>
             <Link href="/login" className="hover:text-white transition-colors">Login</Link>
           </div>
-        </div>
+      </div>
       </footer>
     </div>
   );

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import * as fabric from 'fabric';
 import { useRouter } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
+// export const dynamic = 'force-dynamic';
 
 export default function EditorPage() {
   const [prompt, setPrompt] = useState('A two bedroom house with a large kitchen and living room');
