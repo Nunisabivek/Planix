@@ -27,4 +27,6 @@ model User {
   referredByCode String?
   referralDiscountEligible Boolean @default(false)
   referralDiscountUsed     Boolean @default(false)
+  resetToken     String?
+  resetTokenExpiry DateTime?
 }

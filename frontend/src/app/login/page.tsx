@@ -219,10 +219,16 @@ export default function LoginPage() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.6 }}
             >
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-sm mb-3">
                 Don't have an account?{' '}
                 <Link href="/signup" className="text-primary hover:underline font-medium transition-colors">
                   Create one now
+                </Link>
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Forgot your password?{' '}
+                <Link href="/forgot-password" className="text-primary hover:underline font-medium transition-colors">
+                  Reset it here
                 </Link>
               </p>
               <div className="mt-4 pt-4 border-t border-border">
