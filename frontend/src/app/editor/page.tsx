@@ -4,6 +4,9 @@ import React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function EditorPage() {
   const [prompt, setPrompt] = useState('A two bedroom house with a large kitchen');
   const [floorPlan, setFloorPlan] = useState<any>(null);

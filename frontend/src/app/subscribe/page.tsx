@@ -7,6 +7,9 @@ declare global {
   }
 }
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function SubscribePage() {
   const handleSubscribe = async () => {
     const token = localStorage.getItem('token');
