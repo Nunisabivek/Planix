@@ -24,6 +24,25 @@ export default function SignupClient() {
     setIsLoading(true);
     setError('');
 
+    // Client-side validation
+    if (!name.trim() || !email.trim() || !password) {
+      setError('Please fill in all required fields');
+      setIsLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email address');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
       const response = await fetch(`${api}/api/auth/register`, {
@@ -31,7 +50,12 @@ export default function SignupClient() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, email, password, referralCode }),
+        body: JSON.stringify({ 
+          name: name.trim(), 
+          email: email.trim().toLowerCase(), 
+          password, 
+          referralCode: referralCode.trim() || undefined 
+        }),
       });
 
       const data = await response.json();
@@ -46,10 +70,18 @@ export default function SignupClient() {
         }));
         router.push('/editor');
       } else {
-        setError(data.error || 'Signup failed');
+        // Handle specific error messages from backend
+        if (data.error.includes('already exists')) {
+          setError('An account with this email already exists. Please try logging in instead.');
+        } else if (data.error.includes('Invalid referral')) {
+          setError('The referral code you entered is invalid. Please check and try again.');
+        } else {
+          setError(data.error || 'Signup failed. Please try again.');
+        }
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      console.error('Signup error:', error);
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -173,6 +205,13 @@ export default function SignupClient() {
                 transition={{ duration: 0.3 }}
               >
                 {error}
+                {error.includes('already exists') && (
+                  <div className="mt-2">
+                    <Link href="/login" className="text-red-800 underline hover:text-red-900 font-medium">
+                      Go to Login →
+                    </Link>
+                  </div>
+                )}
               </motion.div>
             )}
 

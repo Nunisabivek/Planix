@@ -41,21 +41,48 @@ app.get('/', (req: Request, res: Response) => {
 // Register a new user
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   const { email, password, name, referralCode } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
-  try {
-    // If the user supplied a referral code, check if it exists
-    let referralDiscountEligible = false;
-  let referrerUserId: number | null = null;
-  if (referralCode) {
-    const referrer = await prisma.user.findUnique({ where: { referralCode } });
-    if (referrer) {
-      referralDiscountEligible = true;
-      referrerUserId = referrer.id;
-    }
+
+  // Validation
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'Email, password, and name are required' });
   }
 
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
+  try {
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // If the user supplied a referral code, check if it exists
+    let referralDiscountEligible = false;
+    let referrerUserId: number | null = null;
+    if (referralCode) {
+      const referrer = await prisma.user.findUnique({ where: { referralCode } });
+      if (referrer) {
+        referralDiscountEligible = true;
+        referrerUserId = referrer.id;
+      } else {
+        return res.status(400).json({ error: 'Invalid referral code' });
+      }
+    }
+
     // Generate a unique referralCode for the new user
-    const newReferralCode = 'REF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    let newReferralCode;
+    let isUnique = false;
+    while (!isUnique) {
+      newReferralCode = 'REF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const existingCode = await prisma.user.findUnique({ where: { referralCode: newReferralCode } });
+      if (!existingCode) {
+        isUnique = true;
+      }
+    }
 
     const user = await prisma.user.create({
       data: {
@@ -67,13 +94,24 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
         referralDiscountEligible,
       },
     });
+
     if (referrerUserId) {
-      await prisma.user.update({ where: { id: referrerUserId }, data: { referralDiscountEligible: true } });
+      await prisma.user.update({ 
+        where: { id: referrerUserId }, 
+        data: { referralDiscountEligible: true } 
+      });
     }
+
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' });
-    res.status(201).json({ message: 'User created successfully', userId: user.id, token, referralCode: user.referralCode });
+    res.status(201).json({ 
+      message: 'User created successfully', 
+      userId: user.id, 
+      token, 
+      referralCode: user.referralCode 
+    });
   } catch (error) {
-    res.status(400).json({ error: 'User with this email already exists' });
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error. Please try again.' });
   }
 });
 
