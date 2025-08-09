@@ -1,8 +1,7 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
   const [name, setName] = useState('');
@@ -11,11 +10,14 @@ export default function SignupPage() {
   const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const search = useSearchParams();
 
-  // Pre-fill referral from URL param ?ref=CODE
-  const initialRef = search.get('ref');
-  if (initialRef && !referralCode) setReferralCode(initialRef);
+  // Pre-fill referral from URL param ?ref=CODE without useSearchParams (avoids Suspense requirement)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) setReferralCode((prev) => (prev ? prev : ref));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
