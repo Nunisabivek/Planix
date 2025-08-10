@@ -9,24 +9,26 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // For Supabase: run migrations over the non-pooled connection
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  email          String   @unique
-  name           String?
-  password       String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  plan           String   @default("FREE")
-  credits        Int      @default(5)
-  subscriptionId String?
-  referralCode   String?  @unique
-  referredByCode String?
-  referralDiscountEligible Boolean @default(false)
-  referralDiscountUsed     Boolean @default(false)
-  resetToken     String?
-  resetTokenExpiry DateTime?
+  id                         Int       @id @default(autoincrement())
+  email                      String    @unique
+  name                       String?
+  password                   String
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  plan                       String    @default("FREE")
+  credits                    Int       @default(5)
+  subscriptionId             String?
+  referralCode               String?   @unique
+  referredByCode             String?
+  referralDiscountEligible   Boolean   @default(false)
+  referralDiscountUsed       Boolean   @default(false)
+  resetToken                 String?
+  resetTokenExpiry           DateTime?
 }
