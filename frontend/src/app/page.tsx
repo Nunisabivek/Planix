@@ -5,8 +5,11 @@ import { motion } from 'framer-motion';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.8, ease: [0.6, -0.05, 0.01, 0.99] }
+  animate: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.8, ease: [0.6, -0.05, 0.01, 0.99] }
+  }
 };
 
 const stagger = {
@@ -19,8 +22,11 @@ const stagger = {
 
 const scaleIn = {
   initial: { scale: 0.8, opacity: 0 },
-  animate: { scale: 1, opacity: 1 },
-  transition: { duration: 0.6, ease: "easeOut" }
+  animate: { 
+    scale: 1, 
+    opacity: 1,
+    transition: { duration: 0.6, ease: "easeOut" }
+  }
 };
 
 const features = [
