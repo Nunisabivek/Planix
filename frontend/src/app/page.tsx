@@ -100,6 +100,7 @@ export default function HomePage() {
                 AI-Powered
               </span>{' '}
               Floor Plans
+              <span className="text-xs text-blue-300 block mt-2">v2.0 - Authentication & Forgot Password!</span>
             </motion.h1>
             
             <motion.p
