@@ -72,7 +72,7 @@ const requireAuth = async (req: Request & { userId?: number }, res: Response, ne
 };
 
 app.get('/', (req: Request, res: Response) => {
-  res.send('Welcome to the Planix Backend!');
+  res.send('Welcome to the Planix Backend! Server is running correctly.');
 });
 
 // Register a new user

@@ -1,19 +1,9 @@
-[build]
-builder = "NIXPACKS"
-
-[deploy]
-startCommand = "npm run start"
-restartPolicyType = "ON_FAILURE"
-
-[environments.production]
-variables = { NODE_ENV = "production" }
-
 [[services]]
 name = "backend"
 source = "backend"
 
 [services.backend.build]
-buildCommand = "npm install --legacy-peer-deps && npm run build"
+buildCommand = "cd backend && npm install --legacy-peer-deps && npm run build"
 
 [services.backend.deploy]
-startCommand = "prisma migrate deploy && node dist/index.js"
+startCommand = "cd backend && prisma migrate deploy && node dist/index.js"
