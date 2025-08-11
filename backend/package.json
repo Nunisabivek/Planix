@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "prisma generate && tsc",
-    "start": "node dist/index.js",
-    "start:dev": "npx prisma db push --accept-data-loss && node dist/index.js",
+    "start": "npx prisma db push --accept-data-loss && node dist/index.js",
+    "start:nomigrate": "node dist/index.js",
+    "start:dev": "npx prisma db push --accept-data-loss && nodemon src/index.ts",
     "postinstall": "prisma generate",
     "db:setup": "prisma db push --accept-data-loss",
     "db:migrate": "prisma migrate deploy",

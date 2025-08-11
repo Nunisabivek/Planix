@@ -616,22 +616,36 @@ app.post('/api/payment/verify-credits', requireAuth, async (req: Request & { use
   }
 });
 
-// Test database connection and start server
+// Attempt to connect to DB with retries, but don't crash the server if unreachable
 async function startServer() {
-  try {
-    // Test database connection
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
+  const maxRetries = 5;
+  let connected = false;
 
-    // Start the server
-    app.listen(port, () => {
-      console.log(`🚀 Server is running at http://localhost:${port}`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    await prisma.$disconnect();
-    process.exit(1);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await prisma.$connect();
+      console.log('✅ Database connected successfully');
+      connected = true;
+      break;
+    } catch (err: any) {
+      console.error(`❌ Database connection attempt ${attempt}/${maxRetries} failed:`, err?.message || err);
+      if (attempt < maxRetries) {
+        // Wait an increasing amount of time before retrying (exponential back-off)
+        const delayMs = 2000 * attempt;
+        console.log(`🔄 Retrying in ${delayMs / 1000}s...`);
+        await new Promise(res => setTimeout(res, delayMs));
+      }
+    }
   }
+
+  if (!connected) {
+    console.warn('⚠️  Could not connect to the database after retries. The server will still start; DB-dependent routes will error until connectivity is restored.');
+  }
+
+  app.listen(port, () => {
+    console.log(`🚀 Server is running at http://localhost:${port}`);
+  });
 }
 
+// Start the server (async)
 startServer();
