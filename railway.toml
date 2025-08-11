@@ -16,4 +16,4 @@ source = "backend"
 buildCommand = "npm install --legacy-peer-deps && npm run build"
 
 [services.backend.deploy]
-startCommand = "npm run db:deploy && npm run start:nomigrate"
+startCommand = "npm run start"
