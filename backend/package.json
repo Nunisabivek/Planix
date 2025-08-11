@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "prisma migrate deploy && node dist/index.js",
     "start:nomigrate": "node dist/index.js",
     "start:dev": "npx prisma db push --accept-data-loss && nodemon src/index.ts",
     "postinstall": "prisma generate",

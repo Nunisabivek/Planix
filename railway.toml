@@ -1,6 +1,6 @@
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "backend/Dockerfile"
+[[services]]
+name = "backend" 
+source = "backend"
 
-[deploy]
-startCommand = "cd backend && prisma migrate deploy && node dist/index.js"
+[services.backend.deploy]
+startCommand = "prisma migrate deploy && node dist/index.js"
