@@ -81,7 +81,7 @@ export default function EditorPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
       
       const res = await fetch(`${api}/api/generate-plan`, {
         method: 'POST',

@@ -26,7 +26,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
       const response = await fetch(`${api}/api/auth/login`, {
         method: 'POST',
         headers: {
