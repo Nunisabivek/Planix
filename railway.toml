@@ -1,0 +1,3 @@
+[[services]]
+name = "planix-backend"
+source = "backend"

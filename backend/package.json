@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm install --legacy-peer-deps && prisma generate && tsc",
+    "build": "tsc",
     "start": "node dist/index.js",
     "start:nomigrate": "node dist/index.js",
     "start:dev": "npx prisma db push --accept-data-loss && nodemon src/index.ts",
