@@ -13,7 +13,7 @@ name = "backend"
 source = "backend"
 
 [services.backend.build]
-buildCommand = "npm install && npm run build"
+buildCommand = "npm install --legacy-peer-deps && npm run build"
 
 [services.backend.deploy]
 startCommand = "npm run start"

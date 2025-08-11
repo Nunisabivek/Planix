@@ -1,0 +1,300 @@
+warning: in the working copy of 'backend/src/index.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/src/index.ts b/backend/src/index.ts[m
+[1mindex 7021c82d..e8b0590b 100644[m
+[1m--- a/backend/src/index.ts[m
+[1m+++ b/backend/src/index.ts[m
+[36m@@ -1,16 +1,17 @@[m
+ [m
+[32m+[m[32mimport type { Express, Request, Response, NextFunction } from 'express';[m
+ const express = require('express');[m
+ const cors = require('cors');[m
+ const { PrismaClient } = require('@prisma/client');[m
+ const bcrypt = require('bcrypt');[m
+ const Razorpay = require('razorpay');[m
+[31m-const crypto = require('crypto');[m
+[32m+[m[32mconst nodeCrypto = require('crypto');[m
+ const jwt = require('jsonwebtoken');[m
+ const axios = require('axios');[m
+ const nodemailer = require('nodemailer');[m
+ [m
+ const prisma = new PrismaClient();[m
+[31m-const app = express();[m
+[32m+[m[32mconst app: Express = express();[m
+ const port = process.env.PORT || 8080;[m
+ [m
+ // Email configuration[m
+[36m@@ -31,12 +32,12 @@[m [mapp.use(cors());[m
+ app.use(express.json());[m
+ [m
+ // Simple auth middleware[m
+[31m-const requireAuth = async (req, res, next) => {[m
+[32m+[m[32mconst requireAuth = async (req: Request & { userId?: number }, res: Response, next: NextFunction) => {[m
+   const authHeader = req.headers.authorization;[m
+   if (!authHeader) return res.status(401).json({ error: 'Missing Authorization header' });[m
+   const token = authHeader.replace('Bearer ', '');[m
+   try {[m
+[31m-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');[m
+[32m+[m[32m    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret') as { userId: number };[m
+     req.userId = decoded.userId;[m
+     return next();[m
+   } catch (e) {[m
+[36m@@ -44,13 +45,13 @@[m [mconst requireAuth = async (req, res, next) => {[m
+   }[m
+ };[m
+ [m
+[31m-app.get('/', (req, res) => {[m
+[32m+[m[32mapp.get('/', (req: Request, res: Response) => {[m
+   res.send('Welcome to the Planix Backend!');[m
+ });[m
+ [m
+ // Register a new user[m
+[31m-app.post('/api/auth/register', async (req, res) => {[m
+[31m-  const { email, password, name, referralCode } = req.body;[m
+[32m+[m[32mapp.post('/api/auth/register', async (req: Request, res: Response) => {[m
+[32m+[m[32m  const { email, password, name, referralCode } = req.body as { email: string; password: string; name: string; referralCode?: string };[m
+ [m
+   // Validation[m
+   if (!email || !password || !name) {[m
+[36m@@ -72,7 +73,7 @@[m [mapp.post('/api/auth/register', async (req, res) => {[m
+ [m
+     // If the user supplied a referral code, check if it exists[m
+     let referralDiscountEligible = false;[m
+[31m-    let referrerUserId = null;[m
+[32m+[m[32m    let referrerUserId: number | null = null;[m
+     if (referralCode) {[m
+       const referrer = await prisma.user.findUnique({ where: { referralCode } });[m
+       if (referrer) {[m
+[36m@@ -84,7 +85,7 @@[m [mapp.post('/api/auth/register', async (req, res) => {[m
+     }[m
+ [m
+     // Generate a unique referralCode for the new user[m
+[31m-    let newReferralCode;[m
+[32m+[m[32m    let newReferralCode: string;[m
+     let isUnique = false;[m
+     while (!isUnique) {[m
+       newReferralCode = 'REF-' + Math.random().toString(36).slice(2, 8).toUpperCase();[m
+[36m@@ -99,7 +100,7 @@[m [mapp.post('/api/auth/register', async (req, res) => {[m
+         email,[m
+         password: hashedPassword,[m
+         name,[m
+[31m-        referralCode: newReferralCode,[m
+[32m+[m[32m        referralCode: newReferralCode!,[m
+         referredByCode: referralCode || null,[m
+         referralDiscountEligible,[m
+       },[m
+[36m@@ -126,8 +127,8 @@[m [mapp.post('/api/auth/register', async (req, res) => {[m
+ });[m
+ [m
+ // Login a user[m
+[31m-app.post('/api/auth/login', async (req, res) => {[m
+[31m-  const { email, password } = req.body;[m
+[32m+[m[32mapp.post('/api/auth/login', async (req: Request, res: Response) => {[m
+[32m+[m[32m  const { email, password } = req.body as { email: string; password: string };[m
+   const user = await prisma.user.findUnique({ where: { email } });[m
+ [m
+   if (!user) {[m
+[36m@@ -145,8 +146,8 @@[m [mapp.post('/api/auth/login', async (req, res) => {[m
+ });[m
+ [m
+ // Forgot Password[m
+[31m-app.post('/api/auth/forgot-password', async (req, res) => {[m
+[31m-  const { email } = req.body;[m
+[32m+[m[32mapp.post('/api/auth/forgot-password', async (req: Request, res: Response) => {[m
+[32m+[m[32m  const { email } = req.body as { email: string };[m
+ [m
+   if (!email) {[m
+     return res.status(400).json({ error: 'Email is required' });[m
+[36m@@ -161,7 +162,7 @@[m [mapp.post('/api/auth/forgot-password', async (req, res) => {[m
+     }[m
+ [m
+     // Generate reset token[m
+[31m-    const resetToken = crypto.randomBytes(32).toString('hex');[m
+[32m+[m[32m    const resetToken = (nodeCrypto.randomBytes(32) as Buffer).toString('hex');[m
+     const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour[m
+ [m
+     // Save reset token to database[m
+[36m@@ -198,7 +199,7 @@[m [mapp.post('/api/auth/forgot-password', async (req, res) => {[m
+           </p>[m
+         </div>[m
+       `[m
+[31m-    };[m
+[32m+[m[32m    } as const;[m
+ [m
+     // Send email[m
+     await transporter.sendMail(mailOptions);[m
+[36m@@ -211,8 +212,8 @@[m [mapp.post('/api/auth/forgot-password', async (req, res) => {[m
+ });[m
+ [m
+ // Reset Password[m
+[31m-app.post('/api/auth/reset-password', async (req, res) => {[m
+[31m-  const { token, newPassword } = req.body;[m
+[32m+[m[32mapp.post('/api/auth/reset-password', async (req: Request, res: Response) => {[m
+[32m+[m[32m  const { token, newPassword } = req.body as { token: string; newPassword: string };[m
+ [m
+   if (!token || !newPassword) {[m
+     return res.status(400).json({ error: 'Token and new password are required' });[m
+[36m@@ -258,9 +259,9 @@[m [mapp.post('/api/auth/reset-password', async (req, res) => {[m
+ });[m
+ [m
+ // Generate a floor plan (placeholder)[m
+[31m-app.post('/api/generate-plan', requireAuth, async (req, res) => {[m
+[31m-  const { prompt } = req.body;[m
+[31m-  const userId = req.userId;[m
+[32m+[m[32mapp.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: number }, res: Response) => {[m
+[32m+[m[32m  const { prompt } = req.body as { prompt: string };[m
+[32m+[m[32m  const userId = req.userId!;[m
+   const user = await prisma.user.findUnique({ where: { id: userId } });[m
+   if (!user) return res.status(404).json({ error: 'User not found' });[m
+   if (user.plan !== 'PRO' && user.credits <= 0) {[m
+[36m@@ -306,7 +307,7 @@[m [mENGINEERING CONSTRAINTS:[m
+ [m
+ PROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;[m
+ [m
+[31m-  let floorPlan = null;[m
+[32m+[m[32m  let floorPlan: any | null = null;[m
+   if (deepseekKey) {[m
+     try {[m
+       const { data } = await axios.post('https://api.deepseek.com/chat/completions', {[m
+[36m@@ -374,8 +375,8 @@[m [mPROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;[m
+ });[m
+ [m
+ // Analyze a floor plan[m
+[31m-app.post('/api/analyze-plan', requireAuth, (req, res) => {[m
+[31m-  const { floorPlan } = req.body;[m
+[32m+[m[32mapp.post('/api/analyze-plan', requireAuth, (req: Request, res: Response) => {[m
+[32m+[m[32m  const { floorPlan } = req.body as { floorPlan: any };[m
+ [m
+   if (!floorPlan) {[m
+     return res.status(400).json({ error: 'floorPlan is required' });[m
+[36m@@ -388,7 +389,7 @@[m [mapp.post('/api/analyze-plan', requireAuth, (req, res) => {[m
+   let loadBearingWallLength = 0;[m
+   [m
+   if (floorPlan.walls) {[m
+[31m-    floorPlan.walls.forEach((wall) => {[m
+[32m+[m[32m    floorPlan.walls.forEach((wall: any) => {[m
+       const length = Math.sqrt(Math.pow(wall.to.x - wall.from.x, 2) + Math.pow(wall.to.y - wall.from.y, 2));[m
+       totalWallLength += length;[m
+       if (wall.type === 'load_bearing') {[m
+[36m@@ -399,7 +400,7 @@[m [mapp.post('/api/analyze-plan', requireAuth, (req, res) => {[m
+ [m
+   let totalBuiltArea = 0;[m
+   if (floorPlan.rooms) {[m
+[31m-    totalBuiltArea = floorPlan.rooms.reduce((acc, room) => [m
+[32m+[m[32m    totalBuiltArea = floorPlan.rooms.reduce((acc: number, room: any) =>[m[41m [m
+       acc + (room.dimensions.width * room.dimensions.height), 0);[m
+   }[m
+ [m
+[36m@@ -443,12 +444,12 @@[m [mapp.post('/api/analyze-plan', requireAuth, (req, res) => {[m
+         waterDemand: `${Math.floor(totalBuiltArea * 2)}L/day as per IS 1172`,[m
+         pipework: `${Math.floor(totalWallLength * 2)}m CPVC/PPR supply pipes`,[m
+         drainage: `${Math.floor(totalBuiltArea * 1.5)}m PVC drainage system`,[m
+[31m-        fixtures: `${floorPlan.rooms?.filter((r) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} water points`,[m
+[32m+[m[32m        fixtures: `${floorPlan.rooms?.filter((r: any) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} water points`,[m
+         storage: `${Math.floor(totalBuiltArea * 0.5)}L overhead tank capacity`[m
+       },[m
+       hvac: {[m
+         ventilation: `${Math.floor(totalBuiltArea * 0.1)}m² natural ventilation openings`,[m
+[31m-        exhaustSystems: `${floorPlan.rooms?.filter((r) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} exhaust fans required`[m
+[32m+[m[32m        exhaustSystems: `${floorPlan.rooms?.filter((r: any) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} exhaust fans required`[m
+       }[m
+     },[m
+     costEstimation: {[m
+[36m@@ -489,18 +490,18 @@[m [mapp.post('/api/analyze-plan', requireAuth, (req, res) => {[m
+ });[m
+ [m
+ // Get current user profile[m
+[31m-app.get('/api/me', requireAuth, async (req, res) => {[m
+[31m-  const user = await prisma.user.findUnique({ where: { id: req.userId } });[m
+[32m+[m[32mapp.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: Response) => {[m
+[32m+[m[32m  const user = await prisma.user.findUnique({ where: { id: req.userId! } });[m
+   if (!user) return res.status(404).json({ error: 'User not found' });[m
+   res.json({ id: user.id, email: user.email, plan: user.plan, credits: user.credits, referralCode: user.referralCode, referralDiscountEligible: user.referralDiscountEligible, referralDiscountUsed: user.referralDiscountUsed });[m
+ });[m
+ [m
+ // Create a Razorpay order[m
+[31m-app.post('/api/payment/create-order', requireAuth, async (req, res) => {[m
+[31m-  const { amount, currency, receipt, notes } = req.body;[m
+[32m+[m[32mapp.post('/api/payment/create-order', requireAuth, async (req: Request & { userId?: number }, res: Response) => {[m
+[32m+[m[32m  const { amount, currency, receipt, notes } = req.body as { amount: number; currency: string; receipt: string; notes?: any };[m
+   try {[m
+     // Apply referral discount once if eligible and not used[m
+[31m-    const user = await prisma.user.findUnique({ where: { id: req.userId } });[m
+[32m+[m[32m    const user = await prisma.user.findUnique({ where: { id: req.userId! } });[m
+     if (!user) return res.status(404).json({ error: 'User not found' });[m
+     const monthlyPrice = amount ?? 999;[m
+     const isDiscount = user.referralDiscountEligible && !user.referralDiscountUsed;[m
+[36m@@ -511,7 +512,7 @@[m [mapp.post('/api/payment/create-order', requireAuth, async (req, res) => {[m
+       currency,[m
+       receipt,[m
+       notes,[m
+[31m-    };[m
+[32m+[m[32m    } as const;[m
+     const order = await razorpay.orders.create(options);[m
+     res.json({ ...order, discounted: isDiscount, finalAmount });[m
+   } catch (error) {[m
+[36m@@ -520,11 +521,11 @@[m [mapp.post('/api/payment/create-order', requireAuth, async (req, res) => {[m
+ });[m
+ [m
+ // Verify a Razorpay payment[m
+[31m-app.post('/api/payment/verify', requireAuth, async (req, res) => {[m
+[31m-  const { order_id, payment_id, signature } = req.body;[m
+[32m+[m[32mapp.post('/api/payment/verify', requireAuth, async (req: Request & { userId?: number }, res: Response) => {[m
+[32m+[m[32m  const { order_id, payment_id, signature } = req.body as { order_id: string; payment_id: string; signature: string };[m
+ [m
+[31m-  const generated_signature = crypto[m
+[31m-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)[m
+[32m+[m[32m  const generated_signature = nodeCrypto[m
+[32m+[m[32m    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')[m
+     .update(order_id + '|' + payment_id)[m
+     .digest('hex');[m
+ [m
+[36m@@ -532,7 +533,7 @@[m [mapp.post('/api/payment/verify', requireAuth, async (req, res) => {[m
+     // Payment is successful[m
+     try {[m
+       await prisma.user.update({[m
+[31m-        where: { id: req.userId },[m
+[32m+[m[32m        where: { id: req.userId! },[m
+         data: {[m
+           plan: 'PRO',[m
+           subscriptionId: order_id,[m
+[36m@@ -550,14 +551,14 @@[m [mapp.post('/api/payment/verify', requireAuth, async (req, res) => {[m
+ });[m
+ [m
+ // Create an order for credit top-up (e.g., 10 credits for ₹199)[m
+[31m-app.post('/api/payment/create-order-credits', requireAuth, async (req, res) => {[m
+[32m+[m[32mapp.post('/api/payment/create-order-credits', requireAuth, async (req: Request & { userId?: number }, res: Response) => {[m
+   try {[m
+     const options = {[m
+       amount: 199 * 100,[m
+       currency: 'INR',[m
+       receipt: `credits_${req.userId}_${Date.now()}`,[m
+       notes: { purpose: 'CREDITS_10' },[m
+[31m-    };[m
+[32m+[m[32m    } as const;[m
+     const order = await razorpay.orders.create(options);[m
+     res.json(order);[m
+   } catch (error) {[m
+[36m@@ -566,18 +567,18 @@[m [mapp.post('/api/payment/create-order-credits', requireAuth, async (req, res) => {[m
+ });[m
+ [m
+ // Verify credits purchase and add to user[m
+[31m-app.post('/api/payment/verify-credits', requireAuth, async (req, res) => {[m
+[31m-  const { order_id, payment_id, signature } = req.body;[m
+[32m+[m[32mapp.post('/api/payment/verify-credits', requireAuth, async (req: Request & { userId?: number }, res: Response) => {[m
+[32m+[m[32m  const { order_id, payment_id, signature } = req.body as { order_id: string; payment_id: string; signature: string };[m
+ [m
+[31m-  const generated_signature = crypto[m
+[31m-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)[m
+[32m+[m[32m  const generated_signature = nodeCrypto[m
+[32m+[m[32m    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')[m
+     .update(order_id + '|' + payment_id)[m
+     .digest('hex');[m
+ [m
+   if (generated_signature === signature) {[m
+     try {[m
+       const user = await prisma.user.update({[m
+[31m-        where: { id: req.userId },[m
+[32m+[m[32m        where: { id: req.userId! },[m
+         data: { credits: { increment: 10 } },[m
+       });[m
+       res.json({ message: 'Credits added successfully', credits: user.credits });[m
