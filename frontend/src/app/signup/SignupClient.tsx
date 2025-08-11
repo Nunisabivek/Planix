@@ -44,7 +44,7 @@ export default function SignupClient() {
     }
 
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-backend.onrender.com';
       const response = await fetch(`${api}/api/auth/register`, {
         method: 'POST',
         headers: {

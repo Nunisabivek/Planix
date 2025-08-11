@@ -42,7 +42,7 @@ export default function SubscribePage() {
 
     try {
       // Create order on backend
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-backend.onrender.com';
       const orderRes = await fetch(`${api}/api/payment/create-order`, {
       method: 'POST',
       headers: {
