@@ -1,3 +1,6 @@
-[[services]]
-name = "planix-backend"
-source = "backend"
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+
+[deploy]
+startCommand = "cd backend && prisma migrate deploy && node dist/index.js"
