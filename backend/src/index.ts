@@ -1,16 +1,43 @@
 
-const express = require('express');
-const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
-const axios = require('axios');
-const nodemailer = require('nodemailer');
+import type { Express, Request, Response, NextFunction } from 'express';
+import express from 'express';
+import cors from 'cors';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import nodemailer from 'nodemailer';
 
-const prisma = new PrismaClient();
-const app = express();
+// Initialize Prisma with proper error handling
+const prisma = new PrismaClient({
+  log: ['error', 'warn'],
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM, shutting down gracefully');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT, shutting down gracefully');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+// Environment validation
+const requiredEnvVars = ['DATABASE_URL'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars.join(', '));
+  process.exit(1);
+}
+
+const app: Express = express();
 const port = process.env.PORT || 8080;
 
 // Email configuration
@@ -31,12 +58,12 @@ app.use(cors());
 app.use(express.json());
 
 // Simple auth middleware
-const requireAuth = async (req, res, next) => {
+const requireAuth = async (req: Request & { userId?: number }, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Missing Authorization header' });
   const token = authHeader.replace('Bearer ', '');
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret') as { userId: number };
     req.userId = decoded.userId;
     return next();
   } catch (e) {
@@ -44,13 +71,13 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.send('Welcome to the Planix Backend!');
 });
 
 // Register a new user
-app.post('/api/auth/register', async (req, res) => {
-  const { email, password, name, referralCode } = req.body;
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  const { email, password, name, referralCode } = req.body as { email: string; password: string; name: string; referralCode?: string };
 
   // Validation
   if (!email || !password || !name) {
@@ -72,7 +99,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     // If the user supplied a referral code, check if it exists
     let referralDiscountEligible = false;
-    let referrerUserId = null;
+    let referrerUserId: number | null = null;
     if (referralCode) {
       const referrer = await prisma.user.findUnique({ where: { referralCode } });
       if (referrer) {
@@ -84,7 +111,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Generate a unique referralCode for the new user
-    let newReferralCode;
+    let newReferralCode: string;
     let isUnique = false;
     while (!isUnique) {
       newReferralCode = 'REF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -99,7 +126,7 @@ app.post('/api/auth/register', async (req, res) => {
         email,
         password: hashedPassword,
         name,
-        referralCode: newReferralCode,
+        referralCode: newReferralCode!,
         referredByCode: referralCode || null,
         referralDiscountEligible,
       },
@@ -126,8 +153,8 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Login a user
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  const { email, password } = req.body as { email: string; password: string };
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
@@ -145,8 +172,8 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Forgot Password
-app.post('/api/auth/forgot-password', async (req, res) => {
-  const { email } = req.body;
+app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+  const { email } = req.body as { email: string };
 
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
@@ -198,7 +225,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
           </p>
         </div>
       `
-    };
+    } as const;
 
     // Send email
     await transporter.sendMail(mailOptions);
@@ -211,8 +238,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 });
 
 // Reset Password
-app.post('/api/auth/reset-password', async (req, res) => {
-  const { token, newPassword } = req.body;
+app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body as { token: string; newPassword: string };
 
   if (!token || !newPassword) {
     return res.status(400).json({ error: 'Token and new password are required' });
@@ -258,9 +285,9 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // Generate a floor plan (placeholder)
-app.post('/api/generate-plan', requireAuth, async (req, res) => {
-  const { prompt } = req.body;
-  const userId = req.userId;
+app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { prompt } = req.body as { prompt: string };
+  const userId = req.userId!;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.status(404).json({ error: 'User not found' });
   if (user.plan !== 'PRO' && user.credits <= 0) {
@@ -306,7 +333,7 @@ ENGINEERING CONSTRAINTS:
 
 PROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;
 
-  let floorPlan = null;
+  let floorPlan: any | null = null;
   if (deepseekKey) {
     try {
       const { data } = await axios.post('https://api.deepseek.com/chat/completions', {
@@ -374,8 +401,8 @@ PROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;
 });
 
 // Analyze a floor plan
-app.post('/api/analyze-plan', requireAuth, (req, res) => {
-  const { floorPlan } = req.body;
+app.post('/api/analyze-plan', requireAuth, (req: Request, res: Response) => {
+  const { floorPlan } = req.body as { floorPlan: any };
 
   if (!floorPlan) {
     return res.status(400).json({ error: 'floorPlan is required' });
@@ -388,7 +415,7 @@ app.post('/api/analyze-plan', requireAuth, (req, res) => {
   let loadBearingWallLength = 0;
   
   if (floorPlan.walls) {
-    floorPlan.walls.forEach((wall) => {
+    floorPlan.walls.forEach((wall: any) => {
       const length = Math.sqrt(Math.pow(wall.to.x - wall.from.x, 2) + Math.pow(wall.to.y - wall.from.y, 2));
       totalWallLength += length;
       if (wall.type === 'load_bearing') {
@@ -399,7 +426,7 @@ app.post('/api/analyze-plan', requireAuth, (req, res) => {
 
   let totalBuiltArea = 0;
   if (floorPlan.rooms) {
-    totalBuiltArea = floorPlan.rooms.reduce((acc, room) => 
+    totalBuiltArea = floorPlan.rooms.reduce((acc: number, room: any) => 
       acc + (room.dimensions.width * room.dimensions.height), 0);
   }
 
@@ -443,12 +470,12 @@ app.post('/api/analyze-plan', requireAuth, (req, res) => {
         waterDemand: `${Math.floor(totalBuiltArea * 2)}L/day as per IS 1172`,
         pipework: `${Math.floor(totalWallLength * 2)}m CPVC/PPR supply pipes`,
         drainage: `${Math.floor(totalBuiltArea * 1.5)}m PVC drainage system`,
-        fixtures: `${floorPlan.rooms?.filter((r) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} water points`,
+        fixtures: `${floorPlan.rooms?.filter((r: any) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} water points`,
         storage: `${Math.floor(totalBuiltArea * 0.5)}L overhead tank capacity`
       },
       hvac: {
         ventilation: `${Math.floor(totalBuiltArea * 0.1)}m² natural ventilation openings`,
-        exhaustSystems: `${floorPlan.rooms?.filter((r) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} exhaust fans required`
+        exhaustSystems: `${floorPlan.rooms?.filter((r: any) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} exhaust fans required`
       }
     },
     costEstimation: {
@@ -489,18 +516,18 @@ app.post('/api/analyze-plan', requireAuth, (req, res) => {
 });
 
 // Get current user profile
-app.get('/api/me', requireAuth, async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.userId } });
+app.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ id: user.id, email: user.email, plan: user.plan, credits: user.credits, referralCode: user.referralCode, referralDiscountEligible: user.referralDiscountEligible, referralDiscountUsed: user.referralDiscountUsed });
 });
 
 // Create a Razorpay order
-app.post('/api/payment/create-order', requireAuth, async (req, res) => {
-  const { amount, currency, receipt, notes } = req.body;
+app.post('/api/payment/create-order', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { amount, currency, receipt, notes } = req.body as { amount: number; currency: string; receipt: string; notes?: any };
   try {
     // Apply referral discount once if eligible and not used
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    const user = await prisma.user.findUnique({ where: { id: req.userId! } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     const monthlyPrice = amount ?? 999;
     const isDiscount = user.referralDiscountEligible && !user.referralDiscountUsed;
@@ -511,7 +538,7 @@ app.post('/api/payment/create-order', requireAuth, async (req, res) => {
       currency,
       receipt,
       notes,
-    };
+    } as const;
     const order = await razorpay.orders.create(options);
     res.json({ ...order, discounted: isDiscount, finalAmount });
   } catch (error) {
@@ -520,11 +547,11 @@ app.post('/api/payment/create-order', requireAuth, async (req, res) => {
 });
 
 // Verify a Razorpay payment
-app.post('/api/payment/verify', requireAuth, async (req, res) => {
-  const { order_id, payment_id, signature } = req.body;
+app.post('/api/payment/verify', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { order_id, payment_id, signature } = req.body as { order_id: string; payment_id: string; signature: string };
 
   const generated_signature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
     .update(order_id + '|' + payment_id)
     .digest('hex');
 
@@ -532,7 +559,7 @@ app.post('/api/payment/verify', requireAuth, async (req, res) => {
     // Payment is successful
     try {
       await prisma.user.update({
-        where: { id: req.userId },
+        where: { id: req.userId! },
         data: {
           plan: 'PRO',
           subscriptionId: order_id,
@@ -550,14 +577,14 @@ app.post('/api/payment/verify', requireAuth, async (req, res) => {
 });
 
 // Create an order for credit top-up (e.g., 10 credits for ₹199)
-app.post('/api/payment/create-order-credits', requireAuth, async (req, res) => {
+app.post('/api/payment/create-order-credits', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
   try {
     const options = {
       amount: 199 * 100,
       currency: 'INR',
       receipt: `credits_${req.userId}_${Date.now()}`,
       notes: { purpose: 'CREDITS_10' },
-    };
+    } as const;
     const order = await razorpay.orders.create(options);
     res.json(order);
   } catch (error) {
@@ -566,18 +593,18 @@ app.post('/api/payment/create-order-credits', requireAuth, async (req, res) => {
 });
 
 // Verify credits purchase and add to user
-app.post('/api/payment/verify-credits', requireAuth, async (req, res) => {
-  const { order_id, payment_id, signature } = req.body;
+app.post('/api/payment/verify-credits', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { order_id, payment_id, signature } = req.body as { order_id: string; payment_id: string; signature: string };
 
   const generated_signature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
     .update(order_id + '|' + payment_id)
     .digest('hex');
 
   if (generated_signature === signature) {
     try {
       const user = await prisma.user.update({
-        where: { id: req.userId },
+        where: { id: req.userId! },
         data: { credits: { increment: 10 } },
       });
       res.json({ message: 'Credits added successfully', credits: user.credits });
@@ -589,6 +616,22 @@ app.post('/api/payment/verify-credits', requireAuth, async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`[server]: Server is running at http://localhost:${port}`);
-});
+// Test database connection and start server
+async function startServer() {
+  try {
+    // Test database connection
+    await prisma.$connect();
+    console.log('✅ Database connected successfully');
+
+    // Start the server
+    app.listen(port, () => {
+      console.log(`🚀 Server is running at http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    await prisma.$disconnect();
+    process.exit(1);
+  }
+}
+
+startServer();
