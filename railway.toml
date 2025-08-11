@@ -1,6 +1,9 @@
 [[services]]
-name = "backend" 
+name = "backend"
 source = "backend"
 
+[services.backend.build]
+buildCommand = "npm install --legacy-peer-deps && npm run build"
+
 [services.backend.deploy]
-startCommand = "prisma migrate deploy && node dist/index.js"
+startCommand = "npm run start"
