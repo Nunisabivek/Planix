@@ -1,0 +1,60 @@
+{
+  "name": "Planix - AI Floor Plan Generator",
+  "description": "Professional AI-powered floor plan generator using DeepSeek and Gemini AI",
+  "type": "fullstack",
+  "framework": "nextjs",
+  "frontend": {
+    "directory": "frontend",
+    "framework": "nextjs",
+    "buildCommand": "npm run build",
+    "startCommand": "npm run start",
+    "devCommand": "npm run dev",
+    "port": 3000
+  },
+  "backend": {
+    "directory": "backend", 
+    "framework": "express",
+    "buildCommand": "npm run build",
+    "startCommand": "npm run start",
+    "devCommand": "npm run dev",
+    "port": 8080
+  },
+  "envVars": {
+    "frontend": [
+      "NEXT_PUBLIC_API_URL",
+      "NEXT_PUBLIC_RAZORPAY_KEY_ID"
+    ],
+    "backend": [
+      "DATABASE_URL",
+      "JWT_SECRET",
+      "DEEPSEEK_API_KEY",
+      "GEMINI_API_KEY",
+      "RAZORPAY_KEY_ID",
+      "RAZORPAY_KEY_SECRET",
+      "EMAIL_USER",
+      "EMAIL_PASSWORD",
+      "FRONTEND_URL"
+    ]
+  },
+  "features": [
+    "AI Floor Plan Generation",
+    "DeepSeek Integration", 
+    "Professional CAD Rendering",
+    "Material Estimation",
+    "User Authentication",
+    "Payment Integration",
+    "Project Management"
+  ],
+  "tech_stack": [
+    "Next.js 14",
+    "React 18",
+    "TypeScript",
+    "Express.js",
+    "Prisma",
+    "PostgreSQL",
+    "DeepSeek AI",
+    "Google Gemini",
+    "Tailwind CSS",
+    "Framer Motion"
+  ]
+}
