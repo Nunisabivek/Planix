@@ -1135,8 +1135,8 @@ app.put('/api/projects/:id', requireAuth, async (req: Request & { userId?: numbe
       data: {
         projectId: id,
         version: existingProject.version,
-        floorPlanData: existingProject.floorPlanData,
-        analysisData: existingProject.analysisData,
+        floorPlanData: existingProject.floorPlanData as any,
+        analysisData: existingProject.analysisData as any,
         changeDescription: 'Auto-backup before update'
       }
     });
@@ -1244,8 +1244,8 @@ app.post('/api/projects/:id/restore/:versionId', requireAuth, async (req: Reques
       data: {
         projectId: id,
         version: project.version,
-        floorPlanData: project.floorPlanData,
-        analysisData: project.analysisData,
+        floorPlanData: project.floorPlanData as any,
+        analysisData: project.analysisData as any,
         changeDescription: `Backup before restore to v${version.version}`
       }
     });
@@ -1254,8 +1254,8 @@ app.post('/api/projects/:id/restore/:versionId', requireAuth, async (req: Reques
     const updatedProject = await prisma.project.update({
       where: { id },
       data: {
-        floorPlanData: version.floorPlanData,
-        analysisData: version.analysisData,
+        floorPlanData: version.floorPlanData as any,
+        analysisData: version.analysisData as any,
         version: { increment: 1 },
         updatedAt: new Date()
       }
