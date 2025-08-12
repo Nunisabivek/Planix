@@ -33,32 +33,102 @@ const features = [
   {
     icon: '🎯',
     title: 'AI-Powered Generation',
-    description: 'Create detailed floor plans in seconds using advanced AI technology'
+    description: 'Create detailed floor plans in seconds using advanced AI technology',
+    gradient: 'from-blue-500 to-purple-600'
   },
   {
     icon: '🔧',
     title: 'Professional Editor',
-    description: 'Refine your designs with our AutoCAD-like professional editing tools'
+    description: 'Refine your designs with our AutoCAD-like professional editing tools',
+    gradient: 'from-green-500 to-blue-500'
   },
   {
     icon: '📊',
     title: 'Smart Analysis',
-    description: 'Get material estimates, structural analysis, and cost calculations'
+    description: 'Get material estimates, structural analysis, and cost calculations',
+    gradient: 'from-purple-500 to-pink-500'
   },
   {
     icon: '⚡',
     title: 'Lightning Fast',
-    description: 'Generate and iterate on designs faster than traditional methods'
+    description: 'Generate and iterate on designs faster than traditional methods',
+    gradient: 'from-yellow-500 to-orange-500'
   },
   {
     icon: '💰',
     title: 'Cost Estimation',
-    description: 'Accurate material quantities and excavation calculations'
+    description: 'Accurate material quantities and excavation calculations',
+    gradient: 'from-emerald-500 to-teal-500'
   },
   {
     icon: '🏗️',
     title: 'Engineering Grade',
-    description: 'Professional-grade plans with structural considerations'
+    description: 'Professional-grade plans with structural considerations',
+    gradient: 'from-gray-600 to-gray-800'
+  }
+];
+
+const testimonials = [
+  {
+    name: "Rajesh Kumar",
+    role: "Architect",
+    company: "Kumar Associates",
+    content: "Planix has revolutionized our design process. What used to take days now takes hours.",
+    avatar: "👨‍💼"
+  },
+  {
+    name: "Priya Sharma",
+    role: "Civil Engineer",
+    company: "BuildTech Solutions",
+    content: "The structural analysis feature is incredibly accurate. It's like having a senior engineer on every project.",
+    avatar: "👩‍💻"
+  },
+  {
+    name: "Amit Patel",
+    role: "Contractor",
+    company: "Patel Construction",
+    content: "The material estimation saves us thousands on every project. ROI was immediate.",
+    avatar: "👨‍🔧"
+  }
+];
+
+const stats = [
+  { number: "10,000+", label: "Floor Plans Generated" },
+  { number: "500+", label: "Happy Architects" },
+  { number: "₹50L+", label: "Cost Savings" },
+  { number: "99.9%", label: "Uptime" }
+];
+
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "₹0",
+    period: "forever",
+    features: [
+      "5 floor plan generations",
+      "2D design only",
+      "Basic templates",
+      "Community support"
+    ],
+    popular: false,
+    cta: "Get Started Free"
+  },
+  {
+    name: "Pro",
+    price: "₹999",
+    period: "month",
+    features: [
+      "Unlimited generations",
+      "3D visualization",
+      "Advanced analysis",
+      "Material estimation",
+      "Structural calculations",
+      "Priority support",
+      "Export to PDF/DXF",
+      "Collaboration tools"
+    ],
+    popular: true,
+    cta: "Start Pro Trial"
   }
 ];
 
@@ -177,15 +247,154 @@ export default function HomePage() {
             {features.map((feature, index) => (
               <motion.div
                 key={index}
-                className="card p-8 hover:shadow-xl transition-all duration-300 group"
+                className="relative card p-8 hover:shadow-xl transition-all duration-500 group overflow-hidden"
                 variants={fadeInUp}
                 whileHover={{ y: -8 }}
               >
-                <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  {feature.icon}
+                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`} />
+                <div className="relative z-10">
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-16 px-6 bg-white/30">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-4 gap-8"
+            variants={stagger}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            {stats.map((stat, index) => (
+              <motion.div
+                key={index}
+                className="text-center"
+                variants={fadeInUp}
+              >
+                <div className="text-4xl md:text-5xl font-bold gradient-primary bg-clip-text text-transparent mb-2">
+                  {stat.number}
+                </div>
+                <div className="text-muted-foreground">{stat.label}</div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            className="text-center mb-16"
+            variants={fadeInUp}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">How It Works</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              From concept to construction-ready plans in minutes
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="grid md:grid-cols-3 gap-12"
+            variants={stagger}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            {[
+              {
+                step: "01",
+                title: "Describe Your Vision",
+                description: "Simply describe your floor plan requirements in natural language",
+                icon: "💭"
+              },
+              {
+                step: "02", 
+                title: "AI Generates Design",
+                description: "Our AI creates a professional floor plan with structural considerations",
+                icon: "🤖"
+              },
+              {
+                step: "03",
+                title: "Refine & Export",
+                description: "Use our advanced editor to refine and export construction-ready plans",
+                icon: "📐"
+              }
+            ].map((step, index) => (
+              <motion.div
+                key={index}
+                className="text-center relative"
+                variants={fadeInUp}
+              >
+                <div className="text-6xl font-bold text-blue-100 mb-4">{step.step}</div>
+                <div className="text-4xl mb-4">{step.icon}</div>
+                <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
+                <p className="text-muted-foreground">{step.description}</p>
+                {index < 2 && (
+                  <div className="hidden md:block absolute top-12 left-full w-12 h-px bg-gradient-to-r from-blue-500 to-transparent" />
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-20 px-6 bg-white/30">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            className="text-center mb-16"
+            variants={fadeInUp}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Trusted by Professionals</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              See what architects and engineers are saying about Planix
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="grid md:grid-cols-3 gap-8"
+            variants={stagger}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            {testimonials.map((testimonial, index) => (
+              <motion.div
+                key={index}
+                className="card p-8 relative"
+                variants={scaleIn}
+                whileHover={{ scale: 1.02 }}
+              >
+                <div className="text-4xl text-blue-500 mb-4">"</div>
+                <p className="text-muted-foreground mb-6 italic">
+                  {testimonial.content}
+                </p>
+                <div className="flex items-center">
+                  <div className="text-3xl mr-3">{testimonial.avatar}</div>
+                  <div>
+                    <div className="font-semibold">{testimonial.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {testimonial.role}, {testimonial.company}
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </motion.div>

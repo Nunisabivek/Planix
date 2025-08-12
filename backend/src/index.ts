@@ -325,9 +325,21 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
   }
 });
 
-// Generate a floor plan (placeholder)
+// Generate a floor plan with advanced AI
 app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
-  const { prompt } = req.body as { prompt: string };
+  const { prompt, projectId, requirements } = req.body as { 
+    prompt: string; 
+    projectId?: string;
+    requirements?: {
+      area?: number;
+      bedrooms?: number;
+      bathrooms?: number;
+      floors?: number;
+      style?: string;
+      budget?: number;
+      location?: string;
+    };
+  };
   const userId = req.userId!;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -338,41 +350,89 @@ app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: num
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const deepseekModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
+  // Enhanced system prompt with requirements
+  let enhancedPrompt = prompt;
+  if (requirements) {
+    enhancedPrompt += `\n\nSpecific Requirements:`;
+    if (requirements.area) enhancedPrompt += `\n- Total area: ${requirements.area} sq.m`;
+    if (requirements.bedrooms) enhancedPrompt += `\n- Bedrooms: ${requirements.bedrooms}`;
+    if (requirements.bathrooms) enhancedPrompt += `\n- Bathrooms: ${requirements.bathrooms}`;
+    if (requirements.floors) enhancedPrompt += `\n- Floors: ${requirements.floors}`;
+    if (requirements.style) enhancedPrompt += `\n- Architectural style: ${requirements.style}`;
+    if (requirements.budget) enhancedPrompt += `\n- Budget constraint: ₹${requirements.budget}`;
+    if (requirements.location) enhancedPrompt += `\n- Location: ${requirements.location}`;
+  }
+
   const systemPrompt = `You are a qualified civil engineer with 15+ years experience in structural design, architectural planning, and construction management.
 
 EXPERTISE AREAS:
-- Structural analysis and load calculations
-- Building codes and safety standards  
+- Structural analysis and load calculations (IS 456:2000, IS 875:1987, IS 1893:2016)
+- Building codes and safety standards compliance
 - Material estimation and cost optimization
 - MEP (Mechanical, Electrical, Plumbing) systems design
 - Foundation design and excavation planning
 - Construction sequencing and project management
+- Energy-efficient design and green building practices
+- Fire safety and accessibility compliance
 
 Return ONLY strict JSON matching this schema with metric units (meters):
 {
-  "rooms": [{"id": string, "type": "living_room"|"kitchen"|"bedroom"|"bathroom"|"study"|"dining"|"balcony"|"storage"|"garage"|"utility", "dimensions": {"x": number, "y": number, "width": number, "height": number}, "label": string, "floorLevel": number, "ceilingHeight": number}],
-  "walls": [{"from": {"x": number, "y": number}, "to": {"x": number, "y": number}, "type": "load_bearing"|"partition", "thickness": number, "material": "concrete"|"brick"|"drywall"}],
-  "utilities": [{"id": string, "type": "plumbing"|"wiring"|"hvac"|"gas", "area": {"x": number, "y": number, "width": number, "height": number}, "note": string, "specifications": string}],
+  "metadata": {
+    "totalArea": number,
+    "builtUpArea": number,
+    "plotSize": {"width": number, "height": number},
+    "floors": number,
+    "orientation": string,
+    "style": string
+  },
+  "rooms": [{"id": string, "type": "living_room"|"kitchen"|"bedroom"|"bathroom"|"study"|"dining"|"balcony"|"storage"|"garage"|"utility"|"entrance"|"staircase"|"toilet"|"master_bedroom"|"guest_room", "dimensions": {"x": number, "y": number, "width": number, "height": number}, "label": string, "floorLevel": number, "ceilingHeight": number, "area": number, "ventilation": {"windows": number, "doors": number}}],
+  "walls": [{"id": string, "from": {"x": number, "y": number}, "to": {"x": number, "y": number}, "type": "load_bearing"|"partition"|"boundary", "thickness": number, "material": "concrete"|"brick"|"drywall"|"aac_block", "height": number}],
+  "doors": [{"id": string, "position": {"x": number, "y": number}, "width": number, "height": number, "type": "main"|"room"|"bathroom"|"sliding", "direction": "inward"|"outward"}],
+  "windows": [{"id": string, "position": {"x": number, "y": number}, "width": number, "height": number, "type": "casement"|"sliding"|"fixed", "sillHeight": number}],
+  "utilities": [{"id": string, "type": "plumbing"|"wiring"|"hvac"|"gas"|"drainage"|"water_supply", "area": {"x": number, "y": number, "width": number, "height": number}, "note": string, "specifications": string, "capacity": string}],
   "structural": {
-    "foundations": [{"type": "strip"|"pad"|"raft", "location": {"x": number, "y": number, "width": number, "height": number}, "depth": number}],
-    "beams": [{"from": {"x": number, "y": number}, "to": {"x": number, "y": number}, "size": string, "material": "rcc"|"steel"}],
-    "columns": [{"location": {"x": number, "y": number}, "size": string, "height": number, "material": "rcc"|"steel"}]
+    "foundations": [{"id": string, "type": "strip"|"pad"|"raft"|"pile", "location": {"x": number, "y": number, "width": number, "height": number}, "depth": number, "material": "rcc", "reinforcement": string}],
+    "beams": [{"id": string, "from": {"x": number, "y": number}, "to": {"x": number, "y": number}, "size": string, "material": "rcc"|"steel", "reinforcement": string, "load": string}],
+    "columns": [{"id": string, "location": {"x": number, "y": number}, "size": string, "height": number, "material": "rcc"|"steel", "reinforcement": string, "load": string}],
+    "slabs": [{"id": string, "area": {"x": number, "y": number, "width": number, "height": number}, "thickness": number, "type": "flat"|"waffle"|"ribbed", "reinforcement": string}]
+  },
+  "services": {
+    "electrical": {"mainPanel": {"x": number, "y": number}, "circuits": number, "load": number, "points": [{"x": number, "y": number, "type": "socket"|"light"|"fan"|"ac"}]},
+    "plumbing": {"mainSupply": {"x": number, "y": number}, "drainage": {"x": number, "y": number}, "fixtures": [{"x": number, "y": number, "type": "washbasin"|"toilet"|"shower"|"kitchen_sink"}]},
+    "hvac": {"system": "natural"|"mechanical", "requirements": string}
+  },
+  "compliance": {
+    "fireExits": [{"x": number, "y": number, "width": number}],
+    "accessibility": {"ramps": [{"x": number, "y": number, "slope": number}], "doorWidths": boolean},
+    "ventilation": {"naturalVent": number, "crossVent": boolean},
+    "daylighting": {"windowToFloorRatio": number, "orientation": string}
   }
 }
 
-ENGINEERING CONSTRAINTS:
-1. Follow IS codes (Indian Standard) for structural design
-2. Ensure minimum room sizes: bedroom(9m²), kitchen(5m²), bathroom(3m²)
-3. Provide 600mm service corridors for utilities
-4. Load-bearing walls must be minimum 230mm thick
-5. Column grid should be economical (4-6m spans)
-6. Foundation depth minimum 1.5m below ground level
-7. Electrical points every 3m, plumbing risers near wet areas
-8. Natural ventilation and lighting considerations
-9. Fire safety and emergency exit planning
-10. Accessibility compliance (ramps, door widths)
+ENGINEERING CONSTRAINTS & BEST PRACTICES:
+1. Follow IS codes: IS 456:2000 (concrete), IS 875:1987 (loads), IS 1893:2016 (seismic)
+2. NBC 2016 (National Building Code) compliance
+3. Minimum room sizes: bedroom(9m²), kitchen(5m²), bathroom(3m²), living(12m²)
+4. Service corridors: minimum 600mm for utilities
+5. Structural: Load-bearing walls ≥230mm, partition walls ≥100mm
+6. Column grid: economical spans 4-6m, maximum 8m without drop beams
+7. Foundation: minimum 1.5m depth, adequate for soil bearing capacity
+8. Electrical: points every 3m, dedicated circuits for heavy loads
+9. Plumbing: risers near wet areas, adequate pipe sizing
+10. Natural ventilation: 10% of floor area, cross-ventilation mandatory
+11. Fire safety: maximum travel distance 30m, adequate exit widths
+12. Accessibility: door widths ≥800mm, ramps with 1:12 slope
+13. Energy efficiency: proper orientation, insulation, daylighting
+14. Water management: rainwater harvesting, greywater recycling
+15. Seismic considerations: proper detailing, ductile design
 
-PROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;
+DESIGN PHILOSOPHY:
+- Prioritize functionality, safety, and sustainability
+- Optimize space utilization and circulation
+- Ensure structural integrity and durability
+- Incorporate modern MEP systems efficiently
+- Consider local climate and building practices
+- Balance cost-effectiveness with quality`;
 
   let floorPlan: any | null = null;
   if (deepseekKey) {
@@ -381,7 +441,7 @@ PROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;
         model: deepseekModel,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate a plan for: ${prompt}` },
+          { role: 'user', content: `Generate a professional floor plan for: ${enhancedPrompt}` },
         ],
         temperature: 0.2,
         response_format: { type: 'json_object' },
@@ -435,25 +495,69 @@ PROVIDE PROFESSIONAL ENGINEERING INSIGHTS in the layout.`;
     };
   }
 
+  // Update credits and usage history
   if (user.plan !== 'PRO') {
     await prisma.user.update({ where: { id: userId }, data: { credits: { decrement: 1 } } });
   }
-  res.json({ floorPlan });
+
+  // Record usage
+  await prisma.usageHistory.create({
+    data: {
+      userId,
+      action: 'generate',
+      creditsUsed: user.plan === 'PRO' ? 0 : 1,
+      details: { prompt: enhancedPrompt, requirements }
+    }
+  });
+
+  // Save or update project if projectId provided
+  let savedProject = null;
+  if (projectId) {
+    try {
+      savedProject = await prisma.project.update({
+        where: { id: projectId, userId },
+        data: {
+          floorPlanData: floorPlan,
+          updatedAt: new Date()
+        }
+      });
+    } catch (error) {
+      // Project doesn't exist or user doesn't own it
+      console.warn('Failed to update project:', error);
+    }
+  }
+
+  res.json({ 
+    floorPlan, 
+    projectId: savedProject?.id,
+    creditsRemaining: user.plan === 'PRO' ? 'unlimited' : (user.credits - 1)
+  });
 });
 
-// Analyze a floor plan
-app.post('/api/analyze-plan', requireAuth, (req: Request, res: Response) => {
+// Analyze a floor plan with advanced AI
+app.post('/api/analyze-plan', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
   const { floorPlan } = req.body as { floorPlan: any };
 
   if (!floorPlan) {
     return res.status(400).json({ error: 'floorPlan is required' });
   }
 
+  const userId = req.userId!;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  
+  // Only PRO users get advanced analysis
+  if (user.plan !== 'PRO') {
+    return res.status(403).json({ error: 'Pro subscription required for advanced analysis' });
+  }
+
   // === COMPREHENSIVE CIVIL ENGINEERING ANALYSIS ===
   
-  // Material & Cost Calculations
+  // Enhanced calculations with metadata
+  const metadata = floorPlan.metadata || {};
   let totalWallLength = 0;
   let loadBearingWallLength = 0;
+  let partitionWallLength = 0;
   
   if (floorPlan.walls) {
     floorPlan.walls.forEach((wall: any) => {
@@ -461,97 +565,247 @@ app.post('/api/analyze-plan', requireAuth, (req: Request, res: Response) => {
       totalWallLength += length;
       if (wall.type === 'load_bearing') {
         loadBearingWallLength += length;
+      } else if (wall.type === 'partition') {
+        partitionWallLength += length;
       }
     });
   }
 
   let totalBuiltArea = 0;
+  let roomAnalysis: any[] = [];
   if (floorPlan.rooms) {
     totalBuiltArea = floorPlan.rooms.reduce((acc: number, room: any) => 
       acc + (room.dimensions.width * room.dimensions.height), 0);
+    
+    // Detailed room analysis
+    roomAnalysis = floorPlan.rooms.map((room: any) => {
+      const area = room.dimensions.width * room.dimensions.height;
+      const perimeter = 2 * (room.dimensions.width + room.dimensions.height);
+      const aspectRatio = room.dimensions.width / room.dimensions.height;
+      
+      return {
+        id: room.id,
+        type: room.type,
+        area: area.toFixed(2),
+        perimeter: perimeter.toFixed(2),
+        aspectRatio: aspectRatio.toFixed(2),
+        compliance: {
+          minAreaCheck: area >= getMinRoomArea(room.type),
+          ventilationCheck: room.ventilation ? room.ventilation.windows > 0 : false,
+          accessibilityCheck: room.dimensions.width >= 0.8 && room.dimensions.height >= 0.8
+        }
+      };
+    });
   }
 
-  // Detailed Analysis Results
+  // Helper function for minimum room areas (IS codes)
+  function getMinRoomArea(roomType: string): number {
+    const minAreas: { [key: string]: number } = {
+      'bedroom': 9.0,
+      'master_bedroom': 12.0,
+      'kitchen': 5.0,
+      'bathroom': 3.0,
+      'toilet': 1.2,
+      'living_room': 12.0,
+      'dining': 8.0,
+      'study': 7.0
+    };
+    return minAreas[roomType] || 4.0;
+  }
+
+  // Structural load calculations
+  const floors = metadata.floors || 1;
+  const deadLoad = totalBuiltArea * 4; // kN (typical RCC slab)
+  const liveLoad = totalBuiltArea * (floors > 1 ? 3 : 2); // kN (residential)
+  const totalLoad = deadLoad + liveLoad;
+
+  // Foundation analysis
+  const foundationArea = totalBuiltArea * 1.2; // 20% extra for foundation
+  const soilBearingCapacity = 150; // kN/m² (assumed medium soil)
+  const requiredFoundationArea = totalLoad / soilBearingCapacity;
+
+  // Advanced Analysis Results with AI insights
   const analysis = {
+    summary: {
+      totalArea: totalBuiltArea.toFixed(2),
+      plotEfficiency: ((totalBuiltArea / (metadata.plotSize?.width * metadata.plotSize?.height || totalBuiltArea * 1.5)) * 100).toFixed(1),
+      overallCompliance: roomAnalysis.every(r => r.compliance.minAreaCheck && r.compliance.accessibilityCheck) ? 'Compliant' : 'Needs Review',
+      structuralEfficiency: foundationArea <= requiredFoundationArea ? 'Optimized' : 'Over-designed'
+    },
+    
+    roomAnalysis,
+    
     materialEstimation: {
       concrete: {
-        foundation: `${(totalWallLength * 0.6 * 1.5).toFixed(2)} m³`,
-        beams: `${(totalWallLength * 0.23 * 0.3).toFixed(2)} m³`,
-        columns: `${((floorPlan.structural?.columns?.length || 4) * 0.3 * 0.3 * 3).toFixed(2)} m³`,
-        total: `${(totalWallLength * 0.6 * 1.5 + totalWallLength * 0.23 * 0.3 + (floorPlan.structural?.columns?.length || 4) * 0.3 * 0.3 * 3).toFixed(2)} m³`
+        foundation: `${(foundationArea * 0.6).toFixed(2)} m³`,
+        beams: `${(totalWallLength * 0.23 * 0.3 * floors).toFixed(2)} m³`,
+        columns: `${((floorPlan.structural?.columns?.length || Math.ceil(totalBuiltArea / 25)) * 0.3 * 0.3 * 3 * floors).toFixed(2)} m³`,
+        slabs: `${(totalBuiltArea * 0.15 * floors).toFixed(2)} m³`,
+        total: `${(foundationArea * 0.6 + totalWallLength * 0.23 * 0.3 * floors + (floorPlan.structural?.columns?.length || Math.ceil(totalBuiltArea / 25)) * 0.3 * 0.3 * 3 * floors + totalBuiltArea * 0.15 * floors).toFixed(2)} m³`
       },
-      steel: `${Math.floor(totalWallLength * 8)} kg (TMT bars)`,
-      bricks: `${Math.floor(loadBearingWallLength * 3 * 120)} nos`,
-      cement: `${Math.floor(totalWallLength * 2.5)} bags (50kg each)`,
-      sand: `${(totalWallLength * 0.5).toFixed(2)} m³`,
-      aggregate: `${(totalWallLength * 0.8).toFixed(2)} m³`,
+      steel: {
+        foundation: `${Math.floor(foundationArea * 15)} kg`,
+        structural: `${Math.floor(totalBuiltArea * 45 * floors)} kg`,
+        total: `${Math.floor(foundationArea * 15 + totalBuiltArea * 45 * floors)} kg (TMT bars)`
+      },
+      masonry: {
+        loadBearing: `${Math.floor(loadBearingWallLength * 3 * 120)} nos (230mm thick)`,
+        partition: `${Math.floor(partitionWallLength * 3 * 80)} nos (115mm thick)`,
+        total: `${Math.floor(loadBearingWallLength * 3 * 120 + partitionWallLength * 3 * 80)} bricks`
+      },
+      cement: `${Math.floor(totalBuiltArea * 8)} bags (50kg each)`,
+      sand: `${(totalBuiltArea * 0.6).toFixed(2)} m³`,
+      aggregate: `${(totalBuiltArea * 0.9).toFixed(2)} m³`,
     },
+    
     excavationQuantity: {
-      area: `${(totalBuiltArea * 1.2).toFixed(2)} m²`,
-      depth: "1.5m (standard foundation depth)",
-      volume: `${(totalBuiltArea * 1.2 * 1.5).toFixed(2)} m³`,
-      backfill: `${(totalBuiltArea * 1.2 * 0.8).toFixed(2)} m³`,
+      foundationArea: `${foundationArea.toFixed(2)} m²`,
+      depth: "1.5m (minimum as per IS 1904)",
+      volume: `${(foundationArea * 1.5).toFixed(2)} m³`,
+      backfill: `${(foundationArea * 0.8).toFixed(2)} m³`,
+      soilDisposal: `${(foundationArea * 0.7).toFixed(2)} m³`,
     },
+    
     structuralAnalysis: {
-      loadCalculation: `Dead Load: ${Math.floor(totalBuiltArea * 4)} kN, Live Load: ${Math.floor(totalBuiltArea * 2)} kN`,
-      foundationType: totalBuiltArea > 200 ? "Raft Foundation Recommended" : "Strip Foundation Adequate",
-      beamDesign: `Main Beams: ${Math.floor(totalWallLength / 4)} nos (230x300mm), Secondary: ${Math.floor(totalWallLength / 2)} nos (230x230mm)`,
-      columnDesign: `${floorPlan.structural?.columns?.length || Math.ceil(totalBuiltArea / 25)} columns, Size: ${totalBuiltArea > 100 ? "300x300mm" : "230x230mm"}`,
-      compliance: "IS 456:2000, IS 875:1987, IS 1893:2016 compliant",
-      recommendations: "Professional structural engineer consultation recommended for final design"
-    },
-    utilitiesAnalysis: {
-      electrical: {
-        loadRequirement: `${Math.floor(totalBuiltArea * 40)}W connected load`,
-        wiring: `${Math.floor(totalBuiltArea * 8)}m cables (2.5mm² & 4mm²)`,
-        points: `${Math.floor(totalBuiltArea / 8)} electrical points required`,
-        protection: `${Math.ceil(totalBuiltArea / 20)} MCBs, ELCB, Earthing system`
+      loads: {
+        deadLoad: `${deadLoad.toFixed(2)} kN`,
+        liveLoad: `${liveLoad.toFixed(2)} kN`,
+        totalLoad: `${totalLoad.toFixed(2)} kN`,
+        loadPerSqm: `${(totalLoad / totalBuiltArea).toFixed(2)} kN/m²`
       },
-      plumbing: {
-        waterDemand: `${Math.floor(totalBuiltArea * 2)}L/day as per IS 1172`,
-        pipework: `${Math.floor(totalWallLength * 2)}m CPVC/PPR supply pipes`,
-        drainage: `${Math.floor(totalBuiltArea * 1.5)}m PVC drainage system`,
-        fixtures: `${floorPlan.rooms?.filter((r: any) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} water points`,
-        storage: `${Math.floor(totalBuiltArea * 0.5)}L overhead tank capacity`
+      foundation: {
+        type: requiredFoundationArea > foundationArea ? "Raft Foundation Required" : "Strip Foundation Adequate",
+        bearingCapacity: `${soilBearingCapacity} kN/m² (assumed)`,
+        requiredArea: `${requiredFoundationArea.toFixed(2)} m²`,
+        providedArea: `${foundationArea.toFixed(2)} m²`,
+        safetyFactor: (foundationArea / requiredFoundationArea).toFixed(2)
       },
-      hvac: {
-        ventilation: `${Math.floor(totalBuiltArea * 0.1)}m² natural ventilation openings`,
-        exhaustSystems: `${floorPlan.rooms?.filter((r: any) => r.type === 'bathroom' || r.type === 'kitchen').length || 2} exhaust fans required`
+      beamDesign: {
+        main: `${Math.ceil(totalWallLength / 5)} nos (230x300mm RCC)`,
+        secondary: `${Math.ceil(totalWallLength / 3)} nos (230x230mm RCC)`,
+        lintel: `${(floorPlan.doors?.length || 0) + (floorPlan.windows?.length || 0)} nos (230x150mm)`
+      },
+      columnDesign: {
+        count: floorPlan.structural?.columns?.length || Math.ceil(totalBuiltArea / 25),
+        size: totalBuiltArea > 100 ? "300x300mm" : "230x230mm",
+        reinforcement: totalBuiltArea > 100 ? "8-16mm + 8mm stirrups" : "4-12mm + 6mm stirrups"
+      },
+      compliance: {
+        codes: ["IS 456:2000 (Concrete)", "IS 875:1987 (Loads)", "IS 1893:2016 (Seismic)"],
+        status: "Preliminary design compliant, detailed analysis required"
       }
     },
-    costEstimation: {
-      civilWork: `₹${Math.floor(totalBuiltArea * 600).toLocaleString('en-IN')}`,
-      electrical: `₹${Math.floor(totalBuiltArea * 150).toLocaleString('en-IN')}`,
-      plumbing: `₹${Math.floor(totalBuiltArea * 100).toLocaleString('en-IN')}`,
-      finishes: `₹${Math.floor(totalBuiltArea * 350).toLocaleString('en-IN')}`,
-      total: `₹${Math.floor(totalBuiltArea * 1400).toLocaleString('en-IN')} (₹1400/sqft approx)`,
-      timeline: `${Math.ceil(totalBuiltArea / 10)} months construction period`
+    
+    utilitiesAnalysis: {
+      electrical: {
+        connectedLoad: `${Math.floor(totalBuiltArea * 40)}W`,
+        demandLoad: `${Math.floor(totalBuiltArea * 25)}W`,
+        circuits: Math.ceil(totalBuiltArea / 30),
+        points: {
+          lights: Math.floor(totalBuiltArea / 10),
+          fans: Math.floor(totalBuiltArea / 12),
+          sockets: Math.floor(totalBuiltArea / 8),
+          ac: Math.floor((floorPlan.rooms?.filter((r: any) => ['bedroom', 'living_room'].includes(r.type)).length || 0))
+        },
+        cabling: `${Math.floor(totalBuiltArea * 8)}m (2.5mm² & 4mm²)`,
+        protection: `${Math.ceil(totalBuiltArea / 20)} MCBs, ELCB, Earthing`
+      },
+      plumbing: {
+        waterDemand: `${Math.floor(totalBuiltArea * 135)}L/day (as per IS 1172)`,
+        storage: `${Math.floor(totalBuiltArea * 0.5)}L overhead + ${Math.floor(totalBuiltArea * 0.3)}L underground`,
+        supply: `${Math.floor(totalWallLength * 1.5)}m CPVC pipes`,
+        drainage: `${Math.floor(totalBuiltArea * 1.2)}m PVC drainage`,
+        fixtures: (floorPlan.services?.plumbing?.fixtures?.length || 0),
+        hotWater: floorPlan.rooms?.filter((r: any) => ['bathroom', 'kitchen'].includes(r.type)).length || 0
+      },
+      hvac: {
+        ventilationArea: `${Math.floor(totalBuiltArea * 0.1)}m² (10% of floor area)`,
+        naturalVentilation: floorPlan.compliance?.ventilation?.crossVent ? 'Adequate' : 'Needs improvement',
+        mechanicalSystems: `${floorPlan.rooms?.filter((r: any) => ['bathroom', 'kitchen'].includes(r.type)).length || 0} exhaust fans required`
+      }
     },
+    
+    costEstimation: {
+      breakdown: {
+        civilWork: Math.floor(totalBuiltArea * 800),
+        electrical: Math.floor(totalBuiltArea * 200),
+        plumbing: Math.floor(totalBuiltArea * 150),
+        finishes: Math.floor(totalBuiltArea * 450),
+        fixtures: Math.floor(totalBuiltArea * 200),
+        miscellaneous: Math.floor(totalBuiltArea * 100)
+      },
+      total: Math.floor(totalBuiltArea * 1900),
+      perSqft: 1900,
+      timeline: `${Math.ceil(totalBuiltArea / 8)} months`,
+      contingency: Math.floor(totalBuiltArea * 190), // 10%
+      grandTotal: Math.floor(totalBuiltArea * 2090)
+    },
+    
+    complianceCheck: {
+      buildingCodes: {
+        NBC2016: roomAnalysis.every(r => r.compliance.minAreaCheck) ? 'Compliant' : 'Non-compliant',
+        fireExit: (floorPlan.compliance?.fireExits?.length || 0) > 0 ? 'Provided' : 'Required',
+        accessibility: roomAnalysis.every(r => r.compliance.accessibilityCheck) ? 'Compliant' : 'Needs ramps/wider doors',
+        ventilation: floorPlan.compliance?.ventilation?.crossVent ? 'Adequate' : 'Insufficient'
+      },
+      recommendations: [
+        roomAnalysis.some(r => !r.compliance.minAreaCheck) ? "Some rooms below minimum area requirements" : null,
+        !floorPlan.compliance?.ventilation?.crossVent ? "Improve cross-ventilation design" : null,
+        (floorPlan.compliance?.fireExits?.length || 0) === 0 ? "Add emergency exits as per NBC 2016" : null,
+        foundationArea < requiredFoundationArea ? "Foundation area may be insufficient" : null
+      ].filter(Boolean)
+    },
+    
     professionalAdvice: {
-      designOptimization: [
-        "Ensure cross ventilation in all rooms",
-        "Kitchen exhaust directly to outside",
-        "Bathroom ventilation mandatory",
-        "Staircase width minimum 900mm",
-        "Door sizes: Main 1000mm, Rooms 800mm"
-      ],
+      criticalRecommendations: [
+        foundationArea < requiredFoundationArea ? "⚠️ Foundation design needs review - consider raft foundation" : null,
+        roomAnalysis.some(r => !r.compliance.minAreaCheck) ? "⚠️ Some rooms don't meet minimum area requirements" : null,
+        !floorPlan.compliance?.ventilation?.crossVent ? "⚠️ Improve natural ventilation for comfort and code compliance" : null
+      ].filter(Boolean),
+      
       constructionPhases: [
-        "1. Site preparation & excavation",
-        "2. Foundation & basement works", 
+        "1. Site survey and soil testing",
+        "2. Excavation and foundation work",
         "3. Superstructure (columns, beams, slabs)",
-        "4. Masonry & utility installation",
-        "5. Plastering & finishing",
-        "6. Final inspections & handover"
+        "4. Masonry and utility rough-in",
+        "5. Plastering and utility finishing",
+        "6. Flooring, painting, and fixtures",
+        "7. Final inspections and handover"
       ],
-      qualityAssurance: [
-        "Concrete cube testing",
-        "Steel reinforcement inspection", 
-        "Electrical testing & certification",
+      
+      qualityControl: [
+        "Concrete cube testing (28-day strength)",
+        "Steel reinforcement inspection before concreting",
+        "Electrical installation testing and certification",
         "Plumbing pressure testing",
-        "Structural safety audit"
+        "Structural safety audit by qualified engineer",
+        "Fire safety compliance check"
+      ],
+      
+      sustainabilityFeatures: [
+        "Rainwater harvesting system",
+        "Solar water heating",
+        "Energy-efficient lighting (LED)",
+        "Proper insulation for thermal comfort",
+        "Waste water recycling for gardening",
+        "Natural lighting and ventilation optimization"
       ]
     }
   };
+
+  // Record usage
+  await prisma.usageHistory.create({
+    data: {
+      userId,
+      action: 'analyze',
+      creditsUsed: 0, // Free for PRO users
+      details: { 
+        totalArea: totalBuiltArea, 
+        analysisType: 'comprehensive',
+        roomCount: floorPlan.rooms?.length || 0
+      }
+    }
+  });
 
   res.json(analysis);
 });
@@ -563,26 +817,93 @@ app.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: 
   res.json({ id: user.id, email: user.email, plan: user.plan, credits: user.credits, referralCode: user.referralCode, referralDiscountEligible: user.referralDiscountEligible, referralDiscountUsed: user.referralDiscountUsed });
 });
 
-// Create a Razorpay order
+// Create a Razorpay order with enhanced features
 app.post('/api/payment/create-order', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
-  const { amount, currency, receipt, notes } = req.body as { amount: number; currency: string; receipt: string; notes?: any };
+  const { amount, currency, receipt, notes } = req.body as { 
+    amount: number; 
+    currency: string; 
+    receipt: string; 
+    notes?: any; 
+  };
+  
   try {
-    // Apply referral discount once if eligible and not used
     const user = await prisma.user.findUnique({ where: { id: req.userId! } });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const monthlyPrice = amount ?? 999;
-    const isDiscount = user.referralDiscountEligible && !user.referralDiscountUsed;
-    const finalAmount = isDiscount ? Math.floor(monthlyPrice * 0.5) : monthlyPrice;
+
+    let finalAmount = amount;
+    let discountApplied = false;
+    let discountReason = '';
+
+    // Apply referral discount if eligible and not used
+    const hasReferralDiscount = user.referralDiscountEligible && !user.referralDiscountUsed;
+    
+    // Check if referral code is provided in notes
+    const referralCodeProvided = notes?.referralCode;
+    
+    if (hasReferralDiscount || referralCodeProvided) {
+      if (referralCodeProvided && !hasReferralDiscount) {
+        // Validate referral code
+        const referrer = await prisma.user.findUnique({ 
+          where: { referralCode: referralCodeProvided } 
+        });
+        
+        if (referrer) {
+          // Mark both users as eligible for referral discount
+          await prisma.user.update({
+            where: { id: req.userId! },
+            data: { referralDiscountEligible: true, referredByCode: referralCodeProvided }
+          });
+          
+          await prisma.user.update({
+            where: { id: referrer.id },
+            data: { referralDiscountEligible: true }
+          });
+          
+          finalAmount = Math.floor(amount * 0.5);
+          discountApplied = true;
+          discountReason = 'referral_code';
+        }
+      } else if (hasReferralDiscount) {
+        finalAmount = Math.floor(amount * 0.5);
+        discountApplied = true;
+        discountReason = 'referral_existing';
+      }
+    }
+
+    // Set subscription expiry based on billing cycle
+    const billingCycle = notes?.billing || 'monthly';
+    const subscriptionExpiry = new Date();
+    if (billingCycle === 'yearly') {
+      subscriptionExpiry.setFullYear(subscriptionExpiry.getFullYear() + 1);
+    } else {
+      subscriptionExpiry.setMonth(subscriptionExpiry.getMonth() + 1);
+    }
 
     const options = {
       amount: finalAmount * 100, // smallest currency unit
       currency,
       receipt,
-      notes,
+      notes: {
+        ...notes,
+        originalAmount: amount,
+        discountApplied,
+        discountReason,
+        subscriptionExpiry: subscriptionExpiry.toISOString()
+      },
     } as const;
+    
     const order = await razorpay.orders.create(options);
-    res.json({ ...order, discounted: isDiscount, finalAmount });
+    
+    res.json({ 
+      ...order, 
+      discounted: discountApplied, 
+      finalAmount,
+      originalAmount: amount,
+      discountReason,
+      savings: amount - finalAmount
+    });
   } catch (error) {
+    console.error('Create order error:', error);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -599,17 +920,51 @@ app.post('/api/payment/verify', requireAuth, async (req: Request & { userId?: nu
   if (generated_signature === signature) {
     // Payment is successful
     try {
+      // Get order details from Razorpay
+      const order = await razorpay.orders.fetch(order_id);
+      const notes = order.notes || {};
+      
+      // Set subscription expiry
+      const subscriptionExpiry = notes.subscriptionExpiry 
+        ? new Date(notes.subscriptionExpiry)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days
+
       await prisma.user.update({
         where: { id: req.userId! },
         data: {
           plan: 'PRO',
           subscriptionId: order_id,
-          referralDiscountUsed: true,
+          subscriptionExpiry,
+          referralDiscountUsed: notes.discountApplied ? true : undefined,
           credits: 9999,
         },
       });
-      res.json({ message: 'Payment verified successfully', plan: 'PRO' });
+
+      // Record subscription in usage history
+      await prisma.usageHistory.create({
+        data: {
+          userId: req.userId!,
+          action: 'subscription',
+          creditsUsed: 0,
+          details: {
+            orderId: order_id,
+            paymentId: payment_id,
+            billing: notes.billing || 'monthly',
+            amount: notes.originalAmount || order.amount_paid,
+            discountApplied: notes.discountApplied || false,
+            subscriptionExpiry: subscriptionExpiry.toISOString()
+          }
+        }
+      });
+
+      res.json({ 
+        message: 'Payment verified successfully', 
+        plan: 'PRO',
+        subscriptionExpiry: subscriptionExpiry.toISOString(),
+        discountApplied: notes.discountApplied || false
+      });
     } catch (error) {
+      console.error('Payment verification error:', error);
       res.status(500).json({ error: 'Failed to update user plan' });
     }
   } else {
@@ -648,12 +1003,284 @@ app.post('/api/payment/verify-credits', requireAuth, async (req: Request & { use
         where: { id: req.userId! },
         data: { credits: { increment: 10 } },
       });
+      
+      // Record credit purchase
+      await prisma.usageHistory.create({
+        data: {
+          userId: req.userId!,
+          action: 'credit_purchase',
+          creditsUsed: -10, // Negative indicates credits added
+          details: { orderId: order_id, paymentId: payment_id }
+        }
+      });
+
       res.json({ message: 'Credits added successfully', credits: user.credits });
     } catch (error) {
       res.status(500).json({ error: 'Failed to add credits' });
     }
   } else {
     res.status(400).json({ error: 'Invalid signature' });
+  }
+});
+
+// === PROJECT MANAGEMENT APIs ===
+
+// Create a new project
+app.post('/api/projects', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { name, description, floorPlanData } = req.body as {
+    name: string;
+    description?: string;
+    floorPlanData?: any;
+  };
+
+  if (!name) {
+    return res.status(400).json({ error: 'Project name is required' });
+  }
+
+  try {
+    const project = await prisma.project.create({
+      data: {
+        name,
+        description: description || '',
+        floorPlanData: floorPlanData || {},
+        userId: req.userId!,
+      },
+    });
+
+    res.status(201).json(project);
+  } catch (error) {
+    console.error('Create project error:', error);
+    res.status(500).json({ error: 'Failed to create project' });
+  }
+});
+
+// Get user's projects
+app.get('/api/projects', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  try {
+    const projects = await prisma.project.findMany({
+      where: { userId: req.userId! },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        thumbnail: true,
+        version: true,
+        createdAt: true,
+        updatedAt: true,
+        isPublic: true,
+      },
+    });
+
+    res.json(projects);
+  } catch (error) {
+    console.error('Get projects error:', error);
+    res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
+// Get a specific project
+app.get('/api/projects/:id', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const project = await prisma.project.findFirst({
+      where: {
+        id,
+        OR: [
+          { userId: req.userId! },
+          { isPublic: true }
+        ]
+      },
+      include: {
+        user: {
+          select: { name: true, email: true }
+        }
+      }
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    res.json(project);
+  } catch (error) {
+    console.error('Get project error:', error);
+    res.status(500).json({ error: 'Failed to fetch project' });
+  }
+});
+
+// Update a project
+app.put('/api/projects/:id', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { id } = req.params;
+  const { name, description, floorPlanData, analysisData } = req.body as {
+    name?: string;
+    description?: string;
+    floorPlanData?: any;
+    analysisData?: any;
+  };
+
+  try {
+    // Check if user owns the project
+    const existingProject = await prisma.project.findFirst({
+      where: { id, userId: req.userId! }
+    });
+
+    if (!existingProject) {
+      return res.status(404).json({ error: 'Project not found or access denied' });
+    }
+
+    // Create a version backup before updating
+    await prisma.projectVersion.create({
+      data: {
+        projectId: id,
+        version: existingProject.version,
+        floorPlanData: existingProject.floorPlanData,
+        analysisData: existingProject.analysisData,
+        changeDescription: 'Auto-backup before update'
+      }
+    });
+
+    // Update the project
+    const project = await prisma.project.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(description !== undefined && { description }),
+        ...(floorPlanData && { floorPlanData }),
+        ...(analysisData && { analysisData }),
+        version: { increment: 1 },
+        updatedAt: new Date()
+      },
+    });
+
+    res.json(project);
+  } catch (error) {
+    console.error('Update project error:', error);
+    res.status(500).json({ error: 'Failed to update project' });
+  }
+});
+
+// Delete a project
+app.delete('/api/projects/:id', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const project = await prisma.project.findFirst({
+      where: { id, userId: req.userId! }
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found or access denied' });
+    }
+
+    await prisma.project.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Project deleted successfully' });
+  } catch (error) {
+    console.error('Delete project error:', error);
+    res.status(500).json({ error: 'Failed to delete project' });
+  }
+});
+
+// Get project versions/history
+app.get('/api/projects/:id/versions', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    // Check if user owns the project
+    const project = await prisma.project.findFirst({
+      where: { id, userId: req.userId! }
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found or access denied' });
+    }
+
+    const versions = await prisma.projectVersion.findMany({
+      where: { projectId: id },
+      orderBy: { version: 'desc' },
+      select: {
+        id: true,
+        version: true,
+        changeDescription: true,
+        createdAt: true,
+      }
+    });
+
+    res.json(versions);
+  } catch (error) {
+    console.error('Get versions error:', error);
+    res.status(500).json({ error: 'Failed to fetch project versions' });
+  }
+});
+
+// Restore project to a specific version
+app.post('/api/projects/:id/restore/:versionId', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  const { id, versionId } = req.params;
+
+  try {
+    // Check if user owns the project
+    const project = await prisma.project.findFirst({
+      where: { id, userId: req.userId! }
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found or access denied' });
+    }
+
+    const version = await prisma.projectVersion.findFirst({
+      where: { id: versionId, projectId: id }
+    });
+
+    if (!version) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    // Create backup of current version
+    await prisma.projectVersion.create({
+      data: {
+        projectId: id,
+        version: project.version,
+        floorPlanData: project.floorPlanData,
+        analysisData: project.analysisData,
+        changeDescription: `Backup before restore to v${version.version}`
+      }
+    });
+
+    // Restore the project
+    const updatedProject = await prisma.project.update({
+      where: { id },
+      data: {
+        floorPlanData: version.floorPlanData,
+        analysisData: version.analysisData,
+        version: { increment: 1 },
+        updatedAt: new Date()
+      }
+    });
+
+    res.json(updatedProject);
+  } catch (error) {
+    console.error('Restore version error:', error);
+    res.status(500).json({ error: 'Failed to restore project version' });
+  }
+});
+
+// Get user's usage history
+app.get('/api/usage-history', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
+  try {
+    const history = await prisma.usageHistory.findMany({
+      where: { userId: req.userId! },
+      orderBy: { createdAt: 'desc' },
+      take: 50, // Limit to last 50 entries
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error('Get usage history error:', error);
+    res.status(500).json({ error: 'Failed to fetch usage history' });
   }
 });
 

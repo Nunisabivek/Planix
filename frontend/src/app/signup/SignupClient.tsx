@@ -44,7 +44,7 @@ export default function SignupClient() {
     }
 
     try {
-      const api = 'https://planix-production-5228.up.railway.app';  // Hardcode to force correct URL
+      const api = 'https://planix-production-5228.up.railway.app';  // Revert to production URL
       const response = await fetch(`${api}/api/auth/register`, {
         method: 'POST',
         headers: {

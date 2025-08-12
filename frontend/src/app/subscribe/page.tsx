@@ -15,6 +15,9 @@ declare global {
 export default function SubscribePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [showReferralInput, setShowReferralInput] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function SubscribePage() {
 
     try {
       // Create order on backend
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
+      const api = 'https://planix-production-5228.up.railway.app';
       const orderRes = await fetch(`${api}/api/payment/create-order`, {
       method: 'POST',
       headers: {
@@ -50,10 +53,15 @@ export default function SubscribePage() {
           Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        amount: 999,
+        amount: selectedPlan === 'yearly' ? 9990 : 999,
         currency: 'INR',
-          receipt: `receipt_${Date.now()}`,
-          notes: { plan: 'PRO' },
+        receipt: `sub_${selectedPlan}_${Date.now()}`,
+        notes: { 
+          plan: 'PRO', 
+          billing: selectedPlan,
+          userId: user?.id,
+          referralCode: referralCode || undefined
+        },
       }),
     });
 
@@ -69,7 +77,7 @@ export default function SubscribePage() {
       amount: order.amount,
       currency: order.currency,
       name: 'Planix Pro',
-        description: 'Monthly Pro Subscription',
+        description: `${selectedPlan === 'yearly' ? 'Annual' : 'Monthly'} Pro Subscription${referralCode ? ' (50% off with referral)' : ''}`,
       order_id: order.id,
       handler: async function (response: any) {
           try {
@@ -195,25 +203,105 @@ export default function SubscribePage() {
                 You're already a Pro member!
               </motion.div>
             ) : (
-              <motion.button
-                onClick={handleSubscribe}
-                disabled={isLoading}
-                className="btn-primary text-lg px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <motion.div
+                className="space-y-6"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Processing...
+                {/* Plan Selection */}
+                <div className="flex justify-center">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full p-1 flex">
+                    <button
+                      onClick={() => setSelectedPlan('monthly')}
+                      className={`px-6 py-3 rounded-full transition-all duration-300 ${
+                        selectedPlan === 'monthly'
+                          ? 'bg-white text-blue-600 shadow-lg'
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setSelectedPlan('yearly')}
+                      className={`px-6 py-3 rounded-full transition-all duration-300 relative ${
+                        selectedPlan === 'yearly'
+                          ? 'bg-white text-blue-600 shadow-lg'
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      Yearly
+                      <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                        Save 17%
+                      </span>
+                    </button>
                   </div>
-                ) : (
-                  'Upgrade to Pro for ₹999/month →'
-                )}
-              </motion.button>
+                </div>
+
+                {/* Pricing Display */}
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-white mb-2">
+                    ₹{selectedPlan === 'yearly' ? '9,990' : '999'}
+                    <span className="text-lg font-normal text-white/70">
+                      /{selectedPlan === 'yearly' ? 'year' : 'month'}
+                    </span>
+                  </div>
+                  {selectedPlan === 'yearly' && (
+                    <div className="text-green-400 text-sm">
+                      ₹831/month - Save ₹1,998 annually
+                    </div>
+                  )}
+                </div>
+
+                {/* Referral Input */}
+                <div className="max-w-md mx-auto">
+                  <button
+                    onClick={() => setShowReferralInput(!showReferralInput)}
+                    className="text-white/70 hover:text-white text-sm underline"
+                  >
+                    Have a referral code? Get 50% off!
+                  </button>
+                  
+                  {showReferralInput && (
+                    <motion.div
+                      className="mt-3"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Enter referral code"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        className="w-full px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {referralCode && (
+                        <div className="mt-2 text-green-400 text-sm">
+                          🎉 Referral code applied! You'll get 50% off your first month.
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+
+                <motion.button
+                  onClick={handleSubscribe}
+                  disabled={isLoading}
+                  className="btn-primary text-lg px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </div>
+                  ) : (
+                    `Start Your Pro Journey →`
+                  )}
+                </motion.button>
+              </motion.div>
             )}
           </motion.div>
         </div>

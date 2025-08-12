@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
     }
 
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
+      const api = 'https://planix-production-5228.up.railway.app';
       const response = await fetch(`${api}/api/auth/forgot-password`, {
         method: 'POST',
         headers: {

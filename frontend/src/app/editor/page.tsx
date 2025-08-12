@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import * as fabric from 'fabric';
 import { useRouter } from 'next/navigation';
+import AdvancedEditor from '../../components/AdvancedEditor';
+import ExportModal from '../../components/ExportModal';
 
 // export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,20 @@ export default function EditorPage() {
   const [buyingCredits, setBuyingCredits] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(false);
+  const [currentProject, setCurrentProject] = useState<any>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [requirements, setRequirements] = useState({
+    area: '',
+    bedrooms: '',
+    bathrooms: '',
+    floors: '1',
+    style: '',
+    budget: '',
+    location: ''
+  });
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [useAdvancedEditor, setUseAdvancedEditor] = useState(true);
+  const [showExportModal, setShowExportModal] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
@@ -51,7 +67,7 @@ export default function EditorPage() {
     }
 
     // Fetch fresh user data
-    const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
+    const api = 'https://planix-production-5228.up.railway.app';
     fetch(`${api}/api/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -81,7 +97,22 @@ export default function EditorPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
+      const api = 'https://planix-production-5228.up.railway.app';
+      
+      // Prepare requirements object
+      const reqData = {
+        prompt,
+        projectId: currentProject?.id,
+        requirements: {
+          ...(requirements.area && { area: parseInt(requirements.area) }),
+          ...(requirements.bedrooms && { bedrooms: parseInt(requirements.bedrooms) }),
+          ...(requirements.bathrooms && { bathrooms: parseInt(requirements.bathrooms) }),
+          ...(requirements.floors && { floors: parseInt(requirements.floors) }),
+          ...(requirements.style && { style: requirements.style }),
+          ...(requirements.budget && { budget: parseInt(requirements.budget) }),
+          ...(requirements.location && { location: requirements.location }),
+        }
+      };
       
       const res = await fetch(`${api}/api/generate-plan`, {
         method: 'POST',
@@ -89,7 +120,7 @@ export default function EditorPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(reqData),
       });
 
       const resp = await res.json();
@@ -101,15 +132,22 @@ export default function EditorPage() {
       setFloorPlan(resp.floorPlan);
       setAnalysisResults(null);
       
+      // Update project if one was being edited
+      if (resp.projectId) {
+        setCurrentProject({ ...currentProject, id: resp.projectId });
+      }
+      
       // Update credits if not PRO
       if (user.plan !== 'PRO') {
-        const updatedUser = { ...user, credits: user.credits - 1 };
+        const updatedUser = { ...user, credits: resp.creditsRemaining };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
       }
 
-      // Render floor plan on canvas
-      renderFloorPlan(resp.floorPlan);
+      // Render floor plan on canvas (for basic editor)
+      if (!useAdvancedEditor) {
+        renderFloorPlan(resp.floorPlan);
+      }
       
     } catch (error) {
       console.error('Generation error:', error);
@@ -203,7 +241,7 @@ export default function EditorPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
+      const api = 'https://planix-production-5228.up.railway.app';
       
       const res = await fetch(`${api}/api/analyze-plan`, {
         method: 'POST',
@@ -233,7 +271,7 @@ export default function EditorPage() {
     setBuyingCredits(true);
     
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
+      const api = 'https://planix-production-5228.up.railway.app';
       const orderRes = await fetch(`${api}/api/payment/create-order-credits`, {
         method: 'POST',
         headers: {
@@ -291,6 +329,163 @@ export default function EditorPage() {
       setBuyingCredits(false);
     }
   };
+
+  // Project Management Functions
+  const createNewProject = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const name = prompt('Enter project name:');
+    if (!name) return;
+
+    try {
+      const api = 'https://planix-production-5228.up.railway.app';
+      const res = await fetch(`${api}/api/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          description: '',
+          floorPlanData: {}
+        }),
+      });
+
+      if (res.ok) {
+        const project = await res.json();
+        setCurrentProject(project);
+        setFloorPlan(null);
+        setAnalysisResults(null);
+        alert('✅ New project created successfully!');
+        loadProjects();
+      }
+    } catch (error) {
+      console.error('Create project error:', error);
+      alert('Failed to create project');
+    }
+  };
+
+  const saveProject = async (canvasData?: any) => {
+    if (!currentProject) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const api = 'https://planix-production-5228.up.railway.app';
+      const res = await fetch(`${api}/api/projects/${currentProject.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          floorPlanData: canvasData || floorPlan,
+          analysisData: analysisResults
+        }),
+      });
+
+      if (res.ok) {
+        alert('✅ Project saved successfully!');
+        loadProjects();
+      }
+    } catch (error) {
+      console.error('Save project error:', error);
+      alert('Failed to save project');
+    }
+  };
+
+  const loadProjects = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const api = 'https://planix-production-5228.up.railway.app';
+      const res = await fetch(`${api}/api/projects`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const projectList = await res.json();
+        setProjects(projectList);
+      }
+    } catch (error) {
+      console.error('Load projects error:', error);
+    }
+  };
+
+  const loadProject = async (projectId: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const api = 'https://planix-production-5228.up.railway.app';
+      const res = await fetch(`${api}/api/projects/${projectId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const project = await res.json();
+        setCurrentProject(project);
+        setFloorPlan(project.floorPlanData);
+        setAnalysisResults(project.analysisData);
+        
+        if (!useAdvancedEditor && project.floorPlanData) {
+          renderFloorPlan(project.floorPlanData);
+        }
+      }
+    } catch (error) {
+      console.error('Load project error:', error);
+      alert('Failed to load project');
+    }
+  };
+
+  const exportProject = async (format?: string) => {
+    if (!floorPlan) {
+      alert('No floor plan to export');
+      return;
+    }
+
+    if (format) {
+      // Quick export for specific format
+      try {
+        const { FloorPlanExporter } = await import('../../utils/exportUtils');
+        
+        const canvasElement = useAdvancedEditor ? null : canvasRef.current;
+        
+        await FloorPlanExporter.exportFloorPlan(
+          format,
+          canvasElement,
+          floorPlan,
+          analysisResults,
+          {
+            quality: 'high',
+            includeAnalysis: user?.plan === 'PRO',
+            includeSpecs: true,
+            paperSize: 'a4'
+          }
+        );
+        
+        alert(`✅ Floor plan exported successfully as ${format.toUpperCase()}!`);
+        
+      } catch (error) {
+        console.error('Export error:', error);
+        alert(`❌ Failed to export as ${format.toUpperCase()}. Please try again.`);
+      }
+    } else {
+      // Open export modal
+      setShowExportModal(true);
+    }
+  };
+
+  // Load projects on component mount
+  useEffect(() => {
+    if (user) {
+      loadProjects();
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -389,63 +584,209 @@ export default function EditorPage() {
           )}
         </motion.div>
 
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-4 gap-6">
-          {/* Control Panel */}
-          <motion.div
-            className="lg:col-span-1 space-y-6"
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            {/* Generation Panel */}
-            <div className="card p-6">
-              <h3 className="text-lg font-semibold mb-4">Generate Floor Plan</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Describe your floor plan
-                  </label>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    className="input w-full resize-none"
-                    rows={4}
-                    placeholder="e.g., A modern 3-bedroom house with open kitchen, large living room, and 2 bathrooms"
-                  />
-                </div>
-                
-                <motion.button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || (user.plan !== 'PRO' && user.credits <= 0)}
-                  className="btn-primary w-full"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+        {/* Editor Mode Toggle */}
+        <div className="mb-6">
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useAdvancedEditor}
+                onChange={(e) => setUseAdvancedEditor(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-sm font-medium">Use Advanced Editor</span>
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={createNewProject}
+                className="btn-outline text-sm"
+              >
+                📁 New Project
+              </button>
+              {currentProject && (
+                <button
+                  onClick={() => saveProject()}
+                  className="btn-primary text-sm"
                 >
-                  {isGenerating ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Generating...
-                    </div>
-                  ) : (
-                    <>Generate Plan {user.plan !== 'PRO' && `(${user.credits} credits)`}</>
-                  )}
-                </motion.button>
-
-                {user.plan !== 'PRO' && user.credits <= 0 && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                    <p className="text-sm text-yellow-800 mb-2">No credits remaining</p>
-                    <button
-                      onClick={handleBuyCredits}
-                      disabled={buyingCredits}
-                      className="btn-outline text-xs w-full"
-                    >
-                      {buyingCredits ? 'Processing...' : 'Buy 10 Credits (₹199)'}
-                    </button>
-                  </div>
-                )}
-              </div>
+                  💾 Save Project
+                </button>
+              )}
             </div>
+          </div>
+        </div>
+
+        {useAdvancedEditor ? (
+          /* Advanced Editor */
+          <motion.div
+            className="bg-white rounded-lg shadow-lg overflow-hidden"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            style={{ height: '80vh' }}
+          >
+            <AdvancedEditor
+              floorPlan={floorPlan}
+              onSave={saveProject}
+              onExport={exportProject}
+              className="h-full"
+            />
+          </motion.div>
+        ) : (
+          /* Basic Editor */
+          <div className="grid lg:grid-cols-4 gap-6">
+            {/* Control Panel */}
+            <motion.div
+              className="lg:col-span-1 space-y-6"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              {/* Project Panel */}
+              {projects.length > 0 && (
+                <div className="card p-6">
+                  <h3 className="text-lg font-semibold mb-4">My Projects</h3>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {projects.map((project) => (
+                      <div
+                        key={project.id}
+                        className={`p-2 rounded-lg cursor-pointer transition-colors ${
+                          currentProject?.id === project.id
+                            ? 'bg-blue-100 border border-blue-300'
+                            : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                        onClick={() => loadProject(project.id)}
+                      >
+                        <p className="text-sm font-medium">{project.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(project.updatedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Generation Panel */}
+              <div className="card p-6">
+                <h3 className="text-lg font-semibold mb-4">Generate Floor Plan</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Describe your floor plan
+                    </label>
+                    <textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      className="input w-full resize-none"
+                      rows={3}
+                      placeholder="e.g., A modern 3-bedroom house with open kitchen, large living room, and 2 bathrooms"
+                    />
+                  </div>
+
+                  {/* Advanced Options */}
+                  <div>
+                    <button
+                      onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      {showAdvancedOptions ? '▼' : '▶'} Advanced Options
+                    </button>
+                    
+                    {showAdvancedOptions && (
+                      <motion.div
+                        className="mt-3 space-y-3"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            placeholder="Area (sq.m)"
+                            value={requirements.area}
+                            onChange={(e) => setRequirements({...requirements, area: e.target.value})}
+                            className="input text-xs"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Bedrooms"
+                            value={requirements.bedrooms}
+                            onChange={(e) => setRequirements({...requirements, bedrooms: e.target.value})}
+                            className="input text-xs"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Bathrooms"
+                            value={requirements.bathrooms}
+                            onChange={(e) => setRequirements({...requirements, bathrooms: e.target.value})}
+                            className="input text-xs"
+                          />
+                          <select
+                            value={requirements.floors}
+                            onChange={(e) => setRequirements({...requirements, floors: e.target.value})}
+                            className="input text-xs"
+                          >
+                            <option value="1">1 Floor</option>
+                            <option value="2">2 Floors</option>
+                            <option value="3">3 Floors</option>
+                          </select>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Style (e.g., Modern, Traditional)"
+                          value={requirements.style}
+                          onChange={(e) => setRequirements({...requirements, style: e.target.value})}
+                          className="input w-full text-xs"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Budget (₹)"
+                          value={requirements.budget}
+                          onChange={(e) => setRequirements({...requirements, budget: e.target.value})}
+                          className="input w-full text-xs"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Location"
+                          value={requirements.location}
+                          onChange={(e) => setRequirements({...requirements, location: e.target.value})}
+                          className="input w-full text-xs"
+                        />
+                      </motion.div>
+                    )}
+                  </div>
+                  
+                  <motion.button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || (user.plan !== 'PRO' && user.credits <= 0)}
+                    className="btn-primary w-full"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isGenerating ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Generating...
+                      </div>
+                    ) : (
+                      <>Generate Plan {user.plan !== 'PRO' && `(${user.credits} credits)`}</>
+                    )}
+                  </motion.button>
+
+                  {user.plan !== 'PRO' && user.credits <= 0 && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                      <p className="text-sm text-yellow-800 mb-2">No credits remaining</p>
+                      <button
+                        onClick={handleBuyCredits}
+                        disabled={buyingCredits}
+                        className="btn-outline text-xs w-full"
+                      >
+                        {buyingCredits ? 'Processing...' : 'Buy 10 Credits (₹199)'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
 
             {/* Analysis Panel */}
             {user.plan === 'PRO' && (
@@ -604,8 +945,145 @@ export default function EditorPage() {
               </div>
             )}
           </motion.div>
+
+          {/* Canvas Area */}
+          <motion.div
+            className="lg:col-span-2"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Design Canvas</h3>
+                {floorPlan && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => exportProject()}
+                      className="btn-primary text-xs px-3 py-1"
+                    >
+                      📤 Export
+                    </button>
+                    <button 
+                      onClick={() => exportProject('pdf')}
+                      className="btn-outline text-xs px-3 py-1"
+                    >
+                      📄 PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center" style={{ minHeight: '600px' }}>
+                {floorPlan ? (
+                  <canvas ref={canvasRef} className="border border-gray-300 rounded bg-white shadow-sm" />
+                ) : (
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">📐</span>
+                    </div>
+                    <p className="text-muted-foreground mb-2">No floor plan generated yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Enter a description and click "Generate Plan" to get started
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Analysis Results Panel */}
+          <motion.div
+            className="lg:col-span-1"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            {showAnalysisPanel && analysisResults ? (
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Analysis Results</h3>
+                  <button
+                    onClick={() => setShowAnalysisPanel(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="font-medium text-sm text-gray-700 mb-2">Material Estimation</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Concrete:</span>
+                        <span className="font-medium">{analysisResults.materialEstimation?.concrete?.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Bricks:</span>
+                        <span className="font-medium">{analysisResults.materialEstimation?.bricks}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Steel:</span>
+                        <span className="font-medium">{analysisResults.materialEstimation?.steel}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium text-sm text-gray-700 mb-2">Cost Estimation</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Civil Work:</span>
+                        <span className="font-medium">{analysisResults.costEstimation?.civilWork}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total:</span>
+                        <span className="font-medium text-blue-600">{analysisResults.costEstimation?.total}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium text-sm text-gray-700 mb-2">Excavation</h4>
+                    <p className="text-sm">{analysisResults.excavationQuantity?.volume}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="card p-6 text-center">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-xl">📊</span>
+                </div>
+                <h3 className="font-medium mb-2">Analysis Results</h3>
+                <p className="text-sm text-muted-foreground">
+                  {user.plan === 'PRO' 
+                    ? 'Generate and analyze a floor plan to see detailed insights here.'
+                    : 'Upgrade to Pro to access advanced analysis features.'
+                  }
+                </p>
+                {user.plan !== 'PRO' && (
+                  <Link href="/subscribe" className="btn-outline text-xs mt-3">
+                    Upgrade to Pro
+                  </Link>
+                )}
+              </div>
+            )}
+          </motion.div>
         </div>
+        )}
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        floorPlan={floorPlan}
+        analysisData={analysisResults}
+        canvasElement={useAdvancedEditor ? null : canvasRef.current}
+        projectName={currentProject?.name || 'floor-plan'}
+        isPro={user?.plan === 'PRO'}
+      />
     </div>
   );
 }
