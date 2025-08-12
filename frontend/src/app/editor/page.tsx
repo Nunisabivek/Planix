@@ -6,11 +6,12 @@ import * as fabric from 'fabric';
 import { useRouter } from 'next/navigation';
 import AdvancedEditor from '../../components/AdvancedEditor';
 import ExportModal from '../../components/ExportModal';
+import { API_BASE_URL } from '../../utils/api';
 
 // export const dynamic = 'force-dynamic';
 
 export default function EditorPage() {
-  const [prompt, setPrompt] = useState('A two bedroom house with a large kitchen and living room');
+  const [userPrompt, setUserPrompt] = useState('A two bedroom house with a large kitchen and living room');
   const [floorPlan, setFloorPlan] = useState<any>(null);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -97,11 +98,11 @@ export default function EditorPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       
       // Prepare requirements object
       const reqData = {
-        prompt,
+        prompt: userPrompt,
         projectId: currentProject?.id,
         requirements: {
           ...(requirements.area && { area: parseInt(requirements.area) }),
@@ -241,7 +242,7 @@ export default function EditorPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       
       const res = await fetch(`${api}/api/analyze-plan`, {
         method: 'POST',
@@ -271,7 +272,7 @@ export default function EditorPage() {
     setBuyingCredits(true);
     
     try {
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       const orderRes = await fetch(`${api}/api/payment/create-order-credits`, {
         method: 'POST',
         headers: {
@@ -335,11 +336,11 @@ export default function EditorPage() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const name = prompt('Enter project name:');
-    if (!name) return;
+    const name = window.prompt('Enter project name:');
+    if (!name || name.trim() === '') return;
 
     try {
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       const res = await fetch(`${api}/api/projects`, {
         method: 'POST',
         headers: {
@@ -374,7 +375,7 @@ export default function EditorPage() {
     if (!token) return;
 
     try {
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       const res = await fetch(`${api}/api/projects/${currentProject.id}`, {
         method: 'PUT',
         headers: {
@@ -402,7 +403,7 @@ export default function EditorPage() {
     if (!token) return;
 
     try {
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       const res = await fetch(`${api}/api/projects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -421,7 +422,7 @@ export default function EditorPage() {
     if (!token) return;
 
     try {
-      const api = 'https://planix-production-5228.up.railway.app';
+      const api = API_BASE_URL;
       const res = await fetch(`${api}/api/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -675,8 +676,8 @@ export default function EditorPage() {
                       Describe your floor plan
                     </label>
                     <textarea
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
+                      value={userPrompt}
+                      onChange={(e) => setUserPrompt(e.target.value)}
                       className="input w-full resize-none"
                       rows={3}
                       placeholder="e.g., A modern 3-bedroom house with open kitchen, large living room, and 2 bathrooms"
