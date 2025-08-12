@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { API_BASE_URL } from '../utils/api';
+import { logout } from '../utils/auth';
 
 interface UserProfile {
   id: number;
@@ -149,9 +150,7 @@ export default function SettingsDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    logout();
   };
 
   const handleDeleteAccount = async () => {

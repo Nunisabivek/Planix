@@ -20,8 +20,13 @@ model User {
   password                   String
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
-  plan                       String    @default("FREE")
-  credits                    Int       @default(5)
+  plan                       String    @default("FREE") // FREE, PRO, PRO_PLUS
+  credits                    Int       @default(50) // Editing credits for FREE users
+  planGenerations           Int       @default(0) // Track plan generations
+  projectsCreated           Int       @default(0) // Track projects created
+  maxProjects               Int       @default(5) // Project limit based on plan
+  maxGenerations            Int       @default(5) // Generation limit for FREE
+  buildingHeightLimit       Int       @default(3) // G+3 for FREE (Ground + 3 floors)
   subscriptionId             String?
   subscriptionExpiry         DateTime?
   referralCode               String?   @unique
@@ -30,6 +35,9 @@ model User {
   referralDiscountUsed       Boolean   @default(false)
   resetToken                 String?
   resetTokenExpiry           DateTime?
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpiry    DateTime?
   
   // Relations
   projects                   Project[]

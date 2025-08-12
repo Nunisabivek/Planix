@@ -9,7 +9,9 @@ import ExportModal from '../../components/ExportModal';
 import UsageDashboard from '../../components/UsageDashboard';
 import BillingDashboard from '../../components/BillingDashboard';
 import SettingsDashboard from '../../components/SettingsDashboard';
+import FloorPlanRenderer from '../../components/FloorPlanRenderer';
 import { API_BASE_URL } from '../../utils/api';
+import { logout } from '../../utils/auth';
 
 // export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,7 @@ export default function EditorPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [currentView, setCurrentView] = useState<'editor' | 'usage' | 'billing' | 'settings'>('editor');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [aiProvider, setAiProvider] = useState<string>('ai');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
@@ -138,6 +141,22 @@ export default function EditorPage() {
       setFloorPlan(resp.floorPlan);
       setAnalysisResults(null);
       
+      // Set AI provider for display
+      if (resp.aiProvider) {
+        setAiProvider(resp.aiProvider);
+      }
+      
+      // Update user data with plan information
+      if (resp.planInfo) {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          user.planInfo = resp.planInfo;
+          user.features = resp.features;
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      }
+      
       // Update project if one was being edited
       if (resp.projectId) {
         setCurrentProject({ ...currentProject, id: resp.projectId });
@@ -155,9 +174,30 @@ export default function EditorPage() {
         renderFloorPlan(resp.floorPlan);
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Generation error:', error);
-      alert('Failed to generate floor plan. Please try again.');
+      
+      // Show specific error messages based on the response
+      let errorMessage = 'Failed to generate floor plan. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message?.includes('Failed to fetch')) {
+        errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. The AI is taking longer than usual. Please try again.';
+      }
+      
+      // If it's an upgrade required error, show upgrade option
+      if (error.response?.data?.upgradeRequired) {
+        const userConfirmed = confirm(`${errorMessage}\n\nWould you like to upgrade to PRO now?`);
+        if (userConfirmed) {
+          window.location.href = '/subscribe';
+          return;
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -627,11 +667,7 @@ export default function EditorPage() {
                     </button>
                     <hr className="my-2" />
                     <button
-                      onClick={() => {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('user');
-                        router.push('/login');
-                      }}
+                      onClick={logout}
                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       🚪 Logout
@@ -648,6 +684,12 @@ export default function EditorPage() {
               <Link href="/" className="btn-secondary text-sm">
                 Home
               </Link>
+              <button
+                onClick={logout}
+                className="btn-outline text-sm text-red-600 border-red-200 hover:bg-red-50"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -965,31 +1007,52 @@ export default function EditorPage() {
           >
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Design Canvas</h3>
+                <h3 className="text-lg font-semibold">Professional Floor Plan</h3>
                 {floorPlan && (
                   <div className="flex gap-2">
-                    <button className="btn-outline text-xs px-3 py-1">
+                    <button 
+                      onClick={() => setShowExportModal(true)}
+                      className="btn-outline text-xs px-3 py-1"
+                    >
                       Export PDF
                     </button>
-                    <button className="btn-outline text-xs px-3 py-1">
+                    <button 
+                      onClick={saveProject}
+                      className="btn-outline text-xs px-3 py-1"
+                    >
                       Save Project
                     </button>
                   </div>
                 )}
               </div>
               
-              <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center" style={{ minHeight: '600px' }}>
+              <div className="rounded-lg" style={{ minHeight: '600px' }}>
                 {floorPlan ? (
-                  <canvas ref={canvasRef} className="border border-gray-300 rounded bg-white shadow-sm" />
+                  <FloorPlanRenderer 
+                    floorPlan={floorPlan}
+                    width={800}
+                    height={600}
+                    showGrid={true}
+                    showDimensions={true}
+                    interactive={true}
+                    aiProvider={aiProvider}
+                  />
                 ) : (
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="text-2xl">📐</span>
+                  <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center" style={{ minHeight: '600px' }}>
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">🏗️</span>
+                      </div>
+                      <p className="text-muted-foreground mb-2">Professional Floor Plan Generator</p>
+                      <p className="text-sm text-muted-foreground">
+                        Enter your requirements and click "Generate Plan" to create a professional floor plan
+                      </p>
+                      <div className="mt-4 flex items-center justify-center space-x-4 text-xs text-gray-500">
+                        <span>✨ AI-Powered</span>
+                        <span>📐 CAD-Quality</span>
+                        <span>📊 Engineering Analysis</span>
+                      </div>
                     </div>
-                    <p className="text-muted-foreground mb-2">No floor plan generated yet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Enter a description and click "Generate Plan" to get started
-                    </p>
                   </div>
                 )}
               </div>

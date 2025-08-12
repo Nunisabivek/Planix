@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import nodemailer from 'nodemailer';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize Prisma with aggressive connection pooling fix for Railway/Supabase
 const prisma = new PrismaClient({
@@ -35,6 +36,52 @@ const connectWithRetry = async () => {
 
 // Initialize connection
 connectWithRetry();
+
+// Plan limits configuration
+const getPlanLimits = (plan: string) => {
+  const limits = {
+    FREE: {
+      maxProjects: 5,
+      maxGenerations: 5,
+      editingCredits: 50,
+      buildingHeight: 3, // G+3
+      structuralAnalysis: 'basic',
+      materialCalculation: 'limited',
+      exportFormats: ['pdf', 'png'],
+      has3DConversion: false,
+      hasAdvancedAnalysis: false,
+      hasComplianceCodes: false
+    },
+    PRO: {
+      maxProjects: 20,
+      maxGenerations: 20,
+      editingCredits: 'unlimited',
+      buildingHeight: 'unlimited',
+      structuralAnalysis: 'advanced',
+      materialCalculation: 'full',
+      exportFormats: ['pdf', 'png', 'svg', 'dxf', 'autocad', '3d'],
+      has3DConversion: true,
+      hasAdvancedAnalysis: true,
+      hasComplianceCodes: true,
+      price: 999, // First time user discount
+      originalPrice: 1599
+    },
+    PRO_PLUS: {
+      maxProjects: 'unlimited',
+      maxGenerations: 'unlimited',
+      editingCredits: 'unlimited',
+      buildingHeight: 'unlimited',
+      structuralAnalysis: 'advanced',
+      materialCalculation: 'unlimited',
+      exportFormats: ['pdf', 'png', 'svg', 'dxf', 'autocad', '3d', 'revit'],
+      has3DConversion: true,
+      hasAdvancedAnalysis: true,
+      hasComplianceCodes: true,
+      price: 2499 // Premium tier
+    }
+  };
+  return limits[plan as keyof typeof limits] || limits.FREE;
+};
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
@@ -181,6 +228,10 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       }
     }
 
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -189,6 +240,9 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
         referralCode: newReferralCode!,
         referredByCode: referralCode || null,
         referralDiscountEligible,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationExpiry,
       },
     });
 
@@ -199,15 +253,107 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       });
     }
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' });
+    // Send verification email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${emailVerificationToken}`;
+
+    const mailOptions = {
+      from: `"Planix" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: '🏗️ Welcome to Planix - Verify Your Email',
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Planix! 🏗️</h1>
+            <p style="color: #e0e7ff; margin: 10px 0 0 0; font-size: 16px;">Professional AI-Powered Floor Plan Generator</p>
+          </div>
+          
+          <div style="background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h2 style="color: #4f46e5; margin-top: 0;">Verify Your Email Address</h2>
+            
+            <p>Hello ${name}! 👋</p>
+            
+            <p>Thank you for joining Planix, the future of architectural design! To get started with creating professional floor plans, please verify your email address.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                ✅ Verify Email Address
+              </a>
+            </div>
+            
+            <div style="margin: 30px 0; padding: 20px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+              <h3 style="color: #0369a1; margin-top: 0;">🎁 Your Benefits:</h3>
+              <ul style="color: #0369a1; margin: 0;">
+                <li><strong>5 Free Generations</strong> - Create your first floor plans</li>
+                <li><strong>AI-Powered Analysis</strong> - Get professional insights</li>
+                <li><strong>Material Estimation</strong> - Cost calculations included</li>
+                ${referralCode ? '<li><strong>50% Referral Discount</strong> - Applied to your account!</li>' : ''}
+              </ul>
+            </div>
+            
+            <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+              This verification link will expire in 24 hours. If you didn't create a Planix account, you can safely ignore this email.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
     res.status(201).json({ 
-      message: 'User created successfully', 
-      userId: user.id, 
-      token, 
+      message: 'Registration successful! Please check your email to verify your account before logging in.',
+      userId: user.id,
+      emailSent: true,
       referralCode: user.referralCode 
     });
   } catch (error) {
     console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error. Please try again.' });
+  }
+});
+
+// Email verification endpoint
+app.get('/api/auth/verify-email', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.query as { token: string };
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpiry: {
+          gt: new Date()
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification token' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null
+      }
+    });
+
+    res.json({ message: 'Email verified successfully! You can now login.' });
+  } catch (error) {
+    console.error('Email verification error:', error);
     res.status(500).json({ error: 'Internal server error. Please try again.' });
   }
 });
@@ -219,6 +365,10 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (!user.emailVerified) {
+    return res.status(403).json({ error: 'Please verify your email address before logging in. Check your inbox for the verification link.' });
   }
 
   const passwordMatch = await bcrypt.compare(password, user.password);
@@ -402,24 +552,70 @@ app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: num
   const userId = req.userId!;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  if (user.plan !== 'PRO' && user.credits <= 0) {
-    return res.status(402).json({ error: 'Insufficient credits' });
+  
+  // Check plan limits and credits
+  const planLimits = getPlanLimits(user.plan);
+  
+  if (user.plan === 'FREE') {
+    if (user.planGenerations >= user.maxGenerations) {
+      return res.status(402).json({ 
+        error: `Free plan limit reached. You can generate up to ${user.maxGenerations} floor plans. Upgrade to PRO for more generations.`,
+        upgradeRequired: true
+      });
+    }
+    if (user.credits <= 0) {
+      return res.status(402).json({ 
+        error: 'No editing credits remaining. Upgrade to PRO for unlimited editing.',
+        upgradeRequired: true
+      });
+    }
+  }
+  
+  if (user.plan === 'PRO' && user.planGenerations >= 20) {
+    return res.status(402).json({ 
+      error: 'PRO plan limit reached (20 plans/month). Upgrade to PRO+ for unlimited plans.',
+      upgradeRequired: true
+    });
   }
 
+  const geminiKey = process.env.GEMINI_API_KEY;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const deepseekModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+  const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 
-  // Enhanced system prompt with requirements
+  // Enhanced system prompt with requirements and plan limits
   let enhancedPrompt = prompt;
   if (requirements) {
     enhancedPrompt += `\n\nSpecific Requirements:`;
     if (requirements.area) enhancedPrompt += `\n- Total area: ${requirements.area} sq.m`;
     if (requirements.bedrooms) enhancedPrompt += `\n- Bedrooms: ${requirements.bedrooms}`;
     if (requirements.bathrooms) enhancedPrompt += `\n- Bathrooms: ${requirements.bathrooms}`;
-    if (requirements.floors) enhancedPrompt += `\n- Floors: ${requirements.floors}`;
+    
+    // Apply building height restrictions based on plan
+    if (requirements.floors) {
+      const requestedFloors = requirements.floors;
+      if (user.plan === 'FREE' && requestedFloors > user.buildingHeightLimit) {
+        return res.status(402).json({ 
+          error: `Free plan allows maximum G+${user.buildingHeightLimit} building (${user.buildingHeightLimit + 1} floors including ground). You requested ${requestedFloors} floors. Upgrade to PRO for unlimited building height.`,
+          upgradeRequired: true,
+          maxAllowedFloors: user.buildingHeightLimit + 1
+        });
+      }
+      enhancedPrompt += `\n- Floors: ${Math.min(requestedFloors, user.plan === 'FREE' ? user.buildingHeightLimit + 1 : requestedFloors)}`;
+    }
+    
     if (requirements.style) enhancedPrompt += `\n- Architectural style: ${requirements.style}`;
     if (requirements.budget) enhancedPrompt += `\n- Budget constraint: ₹${requirements.budget}`;
     if (requirements.location) enhancedPrompt += `\n- Location: ${requirements.location}`;
+  }
+  
+  // Add plan-specific constraints to the prompt
+  const planLimitsInfo = planLimits;
+  enhancedPrompt += `\n\nPlan Constraints (${user.plan}):`;
+  enhancedPrompt += `\n- Building height limit: ${user.plan === 'FREE' ? `G+${user.buildingHeightLimit}` : 'Unlimited'}`;
+  enhancedPrompt += `\n- Structural analysis level: ${planLimitsInfo.structuralAnalysis}`;
+  enhancedPrompt += `\n- Material calculation: ${planLimitsInfo.materialCalculation}`;
+  if (requirements?.location === 'india' || !requirements?.location) {
+    enhancedPrompt += `\n- Building codes: ${planLimitsInfo.hasComplianceCodes ? 'IS codes, NBC 2016 compliance required' : 'Basic compliance only'}`;
   }
 
   const systemPrompt = `You are a qualified civil engineer with 15+ years experience in structural design, architectural planning, and construction management.
@@ -494,32 +690,113 @@ DESIGN PHILOSOPHY:
 - Balance cost-effectiveness with quality`;
 
   let floorPlan: any | null = null;
+  let aiProvider = 'fallback';
+
+  // Try DeepSeek first (better engineering knowledge) - available for all users since credits are pre-paid
   if (deepseekKey) {
+    console.log(`🤖 Attempting DeepSeek AI generation for ${user.plan} user...`);
     try {
       const { data } = await axios.post('https://api.deepseek.com/chat/completions', {
-        model: deepseekModel,
+        model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Generate a professional floor plan for: ${enhancedPrompt}` },
         ],
         temperature: 0.2,
         response_format: { type: 'json_object' },
+        max_tokens: 8192,
       }, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${deepseekKey}`,
         },
+        timeout: 30000, // 30 seconds timeout
       });
+      
+      console.log('📊 DeepSeek API Response Status:', data.id ? 'Success' : 'No ID');
+      console.log('📊 DeepSeek Usage:', data.usage);
+      
       const content = data.choices?.[0]?.message?.content || '';
+      if (!content) {
+        throw new Error('Empty response from DeepSeek API');
+      }
+      
       try {
         floorPlan = JSON.parse(content);
-      } catch {
-        // Some providers wrap JSON in code fences
+        aiProvider = 'deepseek';
+        console.log(`✅ DeepSeek AI generated floor plan successfully (${user.plan} user)`);
+        console.log('🏗️ Generated rooms:', floorPlan.rooms?.length || 0);
+        console.log('🧱 Generated walls:', floorPlan.walls?.length || 0);
+      } catch (parseError) {
+        console.log('⚠️ JSON parse failed, trying to clean response...');
         const cleaned = content.replace(/^```json\n?|```$/g, '').trim();
         floorPlan = JSON.parse(cleaned);
+        aiProvider = 'deepseek';
+        console.log(`✅ DeepSeek AI generated floor plan successfully (${user.plan} user, cleaned)`);
+        console.log('🏗️ Generated rooms:', floorPlan.rooms?.length || 0);
+        console.log('🧱 Generated walls:', floorPlan.walls?.length || 0);
+      }
+    } catch (err: any) {
+      console.error('❌ DeepSeek AI error (trying Gemini fallback):');
+      console.error('   Status:', err.response?.status);
+      console.error('   Status Text:', err.response?.statusText);
+      console.error('   Error Data:', err.response?.data);
+      console.error('   Error Message:', err.message);
+      console.error('   Error Code:', err.code);
+      
+      // Log the specific error for troubleshooting
+      if (err.response?.status === 401) {
+        console.error('🔑 DeepSeek API Key Authentication Failed - Check your API key');
+      } else if (err.response?.status === 429) {
+        console.error('⏱️ DeepSeek API Rate Limit Exceeded - Try again later');
+      } else if (err.response?.status === 500) {
+        console.error('🔧 DeepSeek API Server Error - Their servers might be down');
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+        console.error('⏰ DeepSeek API Timeout - Request took too long');
+      }
+      
+      // Continue to Gemini fallback
+    }
+  } else if (!deepseekKey) {
+    console.log('⚠️ DeepSeek API key not configured, skipping DeepSeek generation');
+  }
+
+  // Try Gemini if DeepSeek failed or for FREE users
+  if (!floorPlan && genAI) {
+    try {
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+        },
+      });
+
+      const fullPrompt = `${systemPrompt}
+
+Generate a professional floor plan for: ${enhancedPrompt}
+
+IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No additional text or explanations.`;
+
+      const result = await model.generateContent(fullPrompt);
+      const response = await result.response;
+      const content = response.text();
+      
+      try {
+        floorPlan = JSON.parse(content);
+        aiProvider = 'gemini';
+        console.log('✅ Gemini AI generated floor plan successfully');
+      } catch {
+        const cleaned = content.replace(/^```json\n?|```$/g, '').trim();
+        floorPlan = JSON.parse(cleaned);
+        aiProvider = 'gemini';
+        console.log('✅ Gemini AI generated floor plan successfully (cleaned)');
       }
     } catch (err) {
-      console.error('DeepSeek error:', err);
+      console.error('Gemini AI error:', err);
     }
   }
 
@@ -554,18 +831,34 @@ DESIGN PHILOSOPHY:
     };
   }
 
-  // Update credits and usage history
-  if (user.plan !== 'PRO') {
-    await prisma.user.update({ where: { id: userId }, data: { credits: { decrement: 1 } } });
+  // Update user stats and credits based on plan
+  const updateData: any = {
+    planGenerations: { increment: 1 }
+  };
+
+  // Deduct credits for FREE users only (PRO and PRO+ have unlimited editing credits)
+  if (user.plan === 'FREE') {
+    updateData.credits = { decrement: 1 };
   }
 
-  // Record usage
+  await prisma.user.update({ 
+    where: { id: userId }, 
+    data: updateData 
+  });
+
+  // Record usage with plan-specific details
   await prisma.usageHistory.create({
     data: {
       userId,
-      action: 'generate',
-      creditsUsed: user.plan === 'PRO' ? 0 : 1,
-      details: { prompt: enhancedPrompt, requirements }
+      action: 'generation',
+      creditsUsed: user.plan === 'FREE' ? 1 : 0,
+      details: { 
+        prompt: enhancedPrompt, 
+        requirements,
+        plan: user.plan,
+        aiProvider,
+        buildingHeight: requirements?.floors || 1
+      }
     }
   });
 
@@ -586,10 +879,37 @@ DESIGN PHILOSOPHY:
     }
   }
 
+  // Get updated user data for response
+  const updatedUser = await prisma.user.findUnique({ where: { id: userId } });
+  
   res.json({ 
     floorPlan, 
     projectId: savedProject?.id,
-    creditsRemaining: user.plan === 'PRO' ? 'unlimited' : (user.credits - 1)
+    aiProvider,
+    planInfo: {
+      currentPlan: user.plan,
+      generationsUsed: updatedUser?.planGenerations || 0,
+      generationsLimit: planLimits.maxGenerations,
+      creditsRemaining: user.plan === 'FREE' ? (updatedUser?.credits || 0) : 'unlimited',
+      projectsCreated: updatedUser?.projectsCreated || 0,
+      projectsLimit: planLimits.maxProjects,
+      canUpgrade: user.plan !== 'PRO_PLUS'
+    },
+    features: {
+      has3DConversion: planLimits.has3DConversion,
+      hasAdvancedAnalysis: planLimits.hasAdvancedAnalysis,
+      hasComplianceCodes: planLimits.hasComplianceCodes,
+      exportFormats: planLimits.exportFormats,
+      structuralAnalysisLevel: planLimits.structuralAnalysis,
+      materialCalculationLevel: planLimits.materialCalculation
+    },
+    metadata: {
+      generatedBy: aiProvider,
+      userPlan: user.plan,
+      timestamp: new Date().toISOString(),
+      buildingHeight: requirements?.floors || 1,
+      maxBuildingHeight: user.plan === 'FREE' ? user.buildingHeightLimit + 1 : 'unlimited'
+    }
   });
 });
 

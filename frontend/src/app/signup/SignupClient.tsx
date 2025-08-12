@@ -11,6 +11,7 @@ export default function SignupClient() {
   const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function SignupClient() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     // Client-side validation
     if (!name.trim() || !email.trim() || !password) {
@@ -56,15 +58,25 @@ export default function SignupClient() {
         }),
       });
 
-      // API request already handles errors and parsing
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify({ 
-        id: data.userId, 
-        referralCode: data.referralCode, 
-        plan: 'FREE', 
-        credits: 5 
-      }));
-      router.push('/editor');
+      // Handle email verification response
+      if (data.emailSent) {
+        // Show success message and redirect to a verification page
+        setSuccess('Account created successfully! Please check your email to verify your account before logging in.');
+        // Don't automatically login, user needs to verify email first
+        setTimeout(() => {
+          router.push('/login?message=Please verify your email before logging in');
+        }, 3000);
+      } else {
+        // Fallback for cases without email verification
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify({ 
+          id: data.userId, 
+          referralCode: data.referralCode, 
+          plan: 'FREE', 
+          credits: 5 
+        }));
+        router.push('/editor');
+      }
     } catch (error) {
       console.error('Signup error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -205,10 +217,26 @@ export default function SignupClient() {
                 {error.includes('already exists') && (
                   <div className="mt-2">
                     <Link href="/login" className="text-red-800 underline hover:text-red-900 font-medium">
-                      Go to Login →
+                      Sign in instead →
                     </Link>
                   </div>
                 )}
+              </motion.div>
+            )}
+
+            {success && (
+              <motion.div
+                className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  {success}
+                </div>
               </motion.div>
             )}
 
