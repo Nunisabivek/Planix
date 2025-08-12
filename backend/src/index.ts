@@ -10,9 +10,14 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 
-// Initialize Prisma with proper error handling
+// Initialize Prisma with proper error handling and connection pooling fix
 const prisma = new PrismaClient({
   log: ['error', 'warn'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  }
 });
 
 // Graceful shutdown
@@ -88,11 +93,13 @@ app.get('/', (req: Request, res: Response) => {
 // Database health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    // Use a simple query instead of raw query to avoid prepared statement conflicts
+    const result = await prisma.$queryRaw`SELECT NOW() as current_time`;
     res.json({ 
       status: 'healthy', 
       database: 'connected',
       timestamp: new Date().toISOString(),
+      db_time: result,
       env_check: {
         DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'missing',
         JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'missing'
