@@ -12,13 +12,13 @@ import nodemailer from 'nodemailer';
 
 // Initialize Prisma with proper error handling and connection pooling fix
 const prisma = new PrismaClient({
-  log: ['error', 'warn'],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL + '?connection_limit=1&pool_timeout=0'
-    }
-  }
+  log: ['error', 'warn']
 });
+
+// Add connection pool configuration to the DATABASE_URL if not already present
+if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('connection_limit')) {
+  process.env.DATABASE_URL += '&connection_limit=5&pool_timeout=20';
+}
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
@@ -93,8 +93,8 @@ app.get('/', (req: Request, res: Response) => {
 // Database health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
-    // Simple connection test without prepared statements
-    await prisma.$queryRaw`SELECT 1`;
+    // Use a simple query that doesn't create prepared statements
+    const result = await prisma.$queryRawUnsafe('SELECT 1 as test');
     res.json({ 
       status: 'healthy', 
       database: 'connected',

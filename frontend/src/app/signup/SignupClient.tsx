@@ -57,28 +57,28 @@ export default function SignupClient() {
       });
 
       // API request already handles errors and parsing
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify({ 
-          id: data.userId, 
-          referralCode: data.referralCode, 
-          plan: 'FREE', 
-          credits: 5 
-        }));
-        router.push('/editor');
-      } else {
-        // Handle specific error messages from backend
-        if (data.error.includes('already exists')) {
-          setError('An account with this email already exists. Please try logging in instead.');
-        } else if (data.error.includes('Invalid referral')) {
-          setError('The referral code you entered is invalid. Please check and try again.');
-        } else {
-          setError(data.error || 'Signup failed. Please try again.');
-        }
-      }
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify({ 
+        id: data.userId, 
+        referralCode: data.referralCode, 
+        plan: 'FREE', 
+        credits: 5 
+      }));
+      router.push('/editor');
     } catch (error) {
       console.error('Signup error:', error);
-      setError('Network error. Please check your connection and try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      // Handle specific error messages from backend
+      if (errorMessage.includes('already exists')) {
+        setError('An account with this email already exists. Please try logging in instead.');
+      } else if (errorMessage.includes('Invalid referral')) {
+        setError('The referral code you entered is invalid. Please check and try again.');
+      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError(errorMessage || 'Signup failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -1,5 +1,8 @@
 // API configuration utility
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+    ? 'http://localhost:8080' 
+    : 'https://planix-production-5228.up.railway.app');
 
 export const apiEndpoints = {
   // Auth endpoints
