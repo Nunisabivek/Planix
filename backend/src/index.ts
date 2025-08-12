@@ -85,6 +85,32 @@ app.get('/', (req: Request, res: Response) => {
   res.send('Welcome to the Planix Backend! Server is running correctly.');
 });
 
+// Database health check endpoint
+app.get('/api/health', async (req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ 
+      status: 'healthy', 
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      env_check: {
+        DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'missing',
+        JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'missing'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      database: 'disconnected',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      env_check: {
+        DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'missing',
+        JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'missing'
+      }
+    });
+  }
+});
+
 // Register a new user
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   const { email, password, name, referralCode } = req.body as { email: string; password: string; name: string; referralCode?: string };
