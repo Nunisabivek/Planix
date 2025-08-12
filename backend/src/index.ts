@@ -12,7 +12,12 @@ import nodemailer from 'nodemailer';
 
 // Initialize Prisma with proper error handling and connection pooling fix
 const prisma = new PrismaClient({
-  log: ['error', 'warn']
+  log: ['error', 'warn'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL + '?connection_limit=1&pool_timeout=0'
+    }
+  }
 });
 
 // Graceful shutdown
@@ -88,11 +93,8 @@ app.get('/', (req: Request, res: Response) => {
 // Database health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
-    // Use findFirst instead of raw query to avoid prepared statement conflicts
-    const testQuery = await prisma.user.findFirst({
-      take: 1,
-      select: { id: true }
-    });
+    // Simple connection test without prepared statements
+    await prisma.$queryRaw`SELECT 1`;
     res.json({ 
       status: 'healthy', 
       database: 'connected',
@@ -104,6 +106,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
+    console.error('Health check error:', error);
     res.status(500).json({ 
       status: 'unhealthy', 
       database: 'disconnected',
