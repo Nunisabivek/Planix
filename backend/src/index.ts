@@ -12,12 +12,7 @@ import nodemailer from 'nodemailer';
 
 // Initialize Prisma with proper error handling and connection pooling fix
 const prisma = new PrismaClient({
-  log: ['error', 'warn'],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-    }
-  }
+  log: ['error', 'warn']
 });
 
 // Graceful shutdown
@@ -93,13 +88,16 @@ app.get('/', (req: Request, res: Response) => {
 // Database health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
-    // Use a simple query instead of raw query to avoid prepared statement conflicts
-    const result = await prisma.$queryRaw`SELECT NOW() as current_time`;
+    // Use findFirst instead of raw query to avoid prepared statement conflicts
+    const testQuery = await prisma.user.findFirst({
+      take: 1,
+      select: { id: true }
+    });
     res.json({ 
       status: 'healthy', 
       database: 'connected',
       timestamp: new Date().toISOString(),
-      db_time: result,
+      test_query: 'success',
       env_check: {
         DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'missing',
         JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'missing'
