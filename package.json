@@ -1,0 +1,21 @@
+{
+  "name": "planix",
+  "version": "1.0.0",
+  "description": "Monorepo with `backend/` (Express + Prisma + Postgres) and `frontend/` (Next.js 14).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nunisabivek/Planix.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Nunisabivek/Planix/issues"
+  },
+  "homepage": "https://github.com/Nunisabivek/Planix#readme"
+}
