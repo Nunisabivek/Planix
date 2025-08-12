@@ -123,7 +123,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
         selectable: false,
         evented: false,
       });
-      gridGroup.addWithUpdate(line);
+      gridGroup.add(line);
     }
 
     // Horizontal lines
@@ -134,11 +134,11 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
         selectable: false,
         evented: false,
       });
-      gridGroup.addWithUpdate(line);
+      gridGroup.add(line);
     }
 
     canvas.add(gridGroup);
-    canvas.sendToBack(gridGroup);
+    canvas.sendObjectToBack(gridGroup);
     canvas.renderAll();
   }, [gridSize]);
 
@@ -186,7 +186,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
       if (newZoom > 20) newZoom = 20;
       if (newZoom < 0.01) newZoom = 0.01;
       
-      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, newZoom);
+      canvas.zoomToPoint(new fabric.Point(opt.e.offsetX, opt.e.offsetY), newZoom);
       setZoom(newZoom);
       opt.e.preventDefault();
       opt.e.stopPropagation();
@@ -504,14 +504,13 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
     if (!fabricCanvas.current) return;
 
     const activeObjects = fabricCanvas.current.getActiveObjects();
-    activeObjects.forEach(obj => {
-      obj.clone((cloned: fabric.Object) => {
-        cloned.set({
-          left: (cloned.left || 0) + 20,
-          top: (cloned.top || 0) + 20,
-        });
-        fabricCanvas.current?.add(cloned);
+    activeObjects.forEach(async (obj) => {
+      const cloned = await obj.clone();
+      cloned.set({
+        left: (cloned.left || 0) + 20,
+        top: (cloned.top || 0) + 20,
       });
+      fabricCanvas.current?.add(cloned);
     });
 
     fabricCanvas.current.renderAll();
@@ -520,7 +519,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
   const saveProject = () => {
     if (!fabricCanvas.current || !onSave) return;
 
-    const canvasData = fabricCanvas.current.toJSON(['layer']);
+    const canvasData = fabricCanvas.current.toJSON();
     onSave(canvasData);
   };
 

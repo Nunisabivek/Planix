@@ -44,8 +44,7 @@ export class FloorPlanExporter {
     // Add floor plan image
     try {
       const canvas = await html2canvas(canvasElement, {
-        scale: options.quality === 'high' ? 2 : options.quality === 'low' ? 0.5 : 1,
-        backgroundColor: '#ffffff'
+        background: '#ffffff'
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -176,8 +175,7 @@ export class FloorPlanExporter {
 
     try {
       const canvas = await html2canvas(canvasElement, {
-        scale: options.quality === 'high' ? 3 : options.quality === 'low' ? 1 : 2,
-        backgroundColor: '#ffffff'
+        background: '#ffffff'
       });
 
       // Create download link
