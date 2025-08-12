@@ -3,7 +3,7 @@ name = "backend"
 source = "backend"
 
 [services.backend.build]
-buildCommand = "npm install --legacy-peer-deps && npm run build"
+buildCommand = "npm ci --omit=dev && npm run build && npx prisma generate"
 
 [services.backend.deploy]
-startCommand = "npm run start:debug"
+startCommand = "npx prisma migrate deploy && npm start"
