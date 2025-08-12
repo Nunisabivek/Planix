@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "next telemetry disable"
+    "postinstall": "next telemetry disable",
+    "export": "next export"
   },
   "dependencies": {
     "fabric": "^6.7.1",
