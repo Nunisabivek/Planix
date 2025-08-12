@@ -51,7 +51,7 @@ export default function EditorPage() {
     }
 
     // Fetch fresh user data
-    const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+    const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
     fetch(`${api}/api/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -203,7 +203,7 @@ export default function EditorPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
       
       const res = await fetch(`${api}/api/analyze-plan`, {
         method: 'POST',
@@ -233,7 +233,7 @@ export default function EditorPage() {
     setBuyingCredits(true);
     
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production.up.railway.app';
+      const api = process.env.NEXT_PUBLIC_API_URL || 'https://planix-production-5228.up.railway.app';
       const orderRes = await fetch(`${api}/api/payment/create-order-credits`, {
         method: 'POST',
         headers: {
