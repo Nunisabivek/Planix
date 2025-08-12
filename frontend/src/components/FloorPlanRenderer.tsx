@@ -75,6 +75,8 @@ export default function FloorPlanRenderer({
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [internalShowGrid, setInternalShowGrid] = useState(showGrid);
+  const [internalShowDimensions, setInternalShowDimensions] = useState(showDimensions);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -103,7 +105,16 @@ export default function FloorPlanRenderer({
       x: (width - bounds.width * autoScale) / 2 - bounds.minX * autoScale,
       y: (height - bounds.height * autoScale) / 2 - bounds.minY * autoScale
     });
-  }, [floorPlan, width, height, selectedRoom]);
+  }, [floorPlan, width, height, selectedRoom, internalShowGrid, internalShowDimensions]);
+
+  // Update internal state when props change
+  useEffect(() => {
+    setInternalShowGrid(showGrid);
+  }, [showGrid]);
+
+  useEffect(() => {
+    setInternalShowDimensions(showDimensions);
+  }, [showDimensions]);
 
   const calculateBounds = (plan: FloorPlanData) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -131,7 +142,7 @@ export default function FloorPlanRenderer({
     ctx.clearRect(0, 0, width, height);
 
     // Draw grid if enabled
-    if (showGrid) {
+    if (internalShowGrid) {
       drawGrid(ctx, scale, offset);
     }
 
@@ -148,7 +159,7 @@ export default function FloorPlanRenderer({
     if (plan.windows) drawWindows(ctx, plan.windows, scale, offset);
 
     // Draw dimensions if enabled
-    if (showDimensions) {
+    if (internalShowDimensions) {
       drawDimensions(ctx, plan.rooms, scale, offset);
     }
 
@@ -434,8 +445,8 @@ export default function FloorPlanRenderer({
           <label className="flex items-center space-x-1">
             <input
               type="checkbox"
-              checked={showGrid}
-              onChange={(e) => setShowGrid && setShowGrid(e.target.checked)}
+              checked={internalShowGrid}
+              onChange={(e) => setInternalShowGrid(e.target.checked)}
               className="rounded"
             />
             <span>Grid</span>
@@ -443,8 +454,8 @@ export default function FloorPlanRenderer({
           <label className="flex items-center space-x-1">
             <input
               type="checkbox"
-              checked={showDimensions}
-              onChange={(e) => setShowDimensions && setShowDimensions(e.target.checked)}
+              checked={internalShowDimensions}
+              onChange={(e) => setInternalShowDimensions(e.target.checked)}
               className="rounded"
             />
             <span>Dimensions</span>

@@ -179,7 +179,7 @@ export default function PricingPage() {
                   <p className="text-gray-600 mb-4">{plan.tagline}</p>
                   
                   <div className="mb-4">
-                    {plan.originalPrice && (
+                    {'originalPrice' in plan && plan.originalPrice && (
                       <div className="text-sm text-gray-500 line-through mb-1">
                         ₹{plan.originalPrice[billingCycle].toLocaleString()}/{billingCycle.slice(0, -2)}
                       </div>
@@ -194,7 +194,7 @@ export default function PricingPage() {
                         </>
                       )}
                     </div>
-                    {plan.discount && (
+                    {'discount' in plan && plan.discount && (
                       <div className="text-sm text-green-600 font-medium mt-1">
                         {plan.discount}
                       </div>
@@ -265,7 +265,7 @@ export default function PricingPage() {
                         </svg>
                         {plan.features.exportFormats}
                       </li>
-                      {plan.features.compliance && (
+                      {'compliance' in plan.features && plan.features.compliance && (
                         <li className="flex items-center text-sm">
                           <svg className="w-4 h-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -276,7 +276,7 @@ export default function PricingPage() {
                     </ul>
                   </div>
 
-                  {plan.features.additional && (
+                  {'additional' in plan.features && plan.features.additional && (
                     <div className="border-t pt-4">
                       <h4 className="font-semibold text-gray-900 mb-3">Advanced Features</h4>
                       <ul className="space-y-2">
@@ -292,7 +292,7 @@ export default function PricingPage() {
                     </div>
                   )}
 
-                  {plan.limitations && (
+                  {'limitations' in plan && plan.limitations && (
                     <div className="border-t pt-4">
                       <h4 className="font-semibold text-red-600 mb-3">Limitations</h4>
                       <ul className="space-y-2">
