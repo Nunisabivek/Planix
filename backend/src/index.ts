@@ -10,15 +10,31 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 
-// Initialize Prisma with proper error handling and connection pooling fix
+// Initialize Prisma with aggressive connection pooling fix for Railway/Supabase
 const prisma = new PrismaClient({
-  log: ['error', 'warn']
+  log: ['error', 'warn'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL?.includes('connection_limit') 
+        ? process.env.DATABASE_URL 
+        : `${process.env.DATABASE_URL}&connection_limit=1&pool_timeout=0&pgbouncer=true`
+    }
+  }
 });
 
-// Add connection pool configuration to the DATABASE_URL if not already present
-if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('connection_limit')) {
-  process.env.DATABASE_URL += '&connection_limit=5&pool_timeout=20';
-}
+// Connection retry logic
+const connectWithRetry = async () => {
+  try {
+    await prisma.$connect();
+    console.log('Database connected successfully');
+  } catch (error) {
+    console.error('Database connection failed, retrying in 5 seconds...', error);
+    setTimeout(connectWithRetry, 5000);
+  }
+};
+
+// Initialize connection
+connectWithRetry();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
@@ -324,6 +340,46 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
     res.status(200).json({ message: 'Password reset successful. You can now login with your new password.' });
   } catch (error) {
     console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error. Please try again.' });
+  }
+});
+
+// Change Password
+app.post('/api/auth/change-password', async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret') as { userId: number };
+    
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const currentPasswordMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!currentPasswordMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: decoded.userId },
+      data: { password: hashedNewPassword }
+    });
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
     res.status(500).json({ error: 'Internal server error. Please try again.' });
   }
 });

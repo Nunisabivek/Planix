@@ -6,6 +6,9 @@ import * as fabric from 'fabric';
 import { useRouter } from 'next/navigation';
 import AdvancedEditor from '../../components/AdvancedEditor';
 import ExportModal from '../../components/ExportModal';
+import UsageDashboard from '../../components/UsageDashboard';
+import BillingDashboard from '../../components/BillingDashboard';
+import SettingsDashboard from '../../components/SettingsDashboard';
 import { API_BASE_URL } from '../../utils/api';
 
 // export const dynamic = 'force-dynamic';
@@ -33,6 +36,8 @@ export default function EditorPage() {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [useAdvancedEditor, setUseAdvancedEditor] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [currentView, setCurrentView] = useState<'editor' | 'usage' | 'billing' | 'settings'>('editor');
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
@@ -527,6 +532,114 @@ export default function EditorPage() {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Navigation Menu */}
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentView('editor')}
+                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                    currentView === 'editor' 
+                      ? 'bg-blue-100 text-blue-700 font-medium' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  Editor
+                </button>
+                <button
+                  onClick={() => setCurrentView('usage')}
+                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                    currentView === 'usage' 
+                      ? 'bg-blue-100 text-blue-700 font-medium' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  Usage
+                </button>
+                <button
+                  onClick={() => setCurrentView('billing')}
+                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                    currentView === 'billing' 
+                      ? 'bg-blue-100 text-blue-700 font-medium' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  Billing
+                </button>
+                <button
+                  onClick={() => setCurrentView('settings')}
+                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                    currentView === 'settings' 
+                      ? 'bg-blue-100 text-blue-700 font-medium' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  Settings
+                </button>
+              </div>
+
+              {/* Mobile Menu Dropdown */}
+              <div className="md:hidden relative">
+                <button
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                
+                {showMobileMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+                  >
+                    <button
+                      onClick={() => { setCurrentView('editor'); setShowMobileMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        currentView === 'editor' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      📊 Editor
+                    </button>
+                    <button
+                      onClick={() => { setCurrentView('usage'); setShowMobileMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        currentView === 'usage' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      📈 Usage
+                    </button>
+                    <button
+                      onClick={() => { setCurrentView('billing'); setShowMobileMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        currentView === 'billing' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      💳 Billing
+                    </button>
+                    <button
+                      onClick={() => { setCurrentView('settings'); setShowMobileMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        currentView === 'settings' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      ⚙️ Settings
+                    </button>
+                    <hr className="my-2" />
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        router.push('/login');
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      🚪 Logout
+                    </button>
+                  </motion.div>
+                )}
+              </div>
+
               {user.plan !== 'PRO' && (
                 <Link href="/subscribe" className="btn-outline text-sm">
                   Upgrade to Pro
@@ -541,7 +654,14 @@ export default function EditorPage() {
       </motion.header>
 
       <div className="max-w-7xl mx-auto p-6">
-        {/* Title Section */}
+        {/* Render different views based on currentView */}
+        {currentView === 'usage' && <UsageDashboard />}
+        {currentView === 'billing' && <BillingDashboard />}
+        {currentView === 'settings' && <SettingsDashboard />}
+        
+        {currentView === 'editor' && (
+          <>
+            {/* Title Section */}
         <motion.div
           className="mb-8"
           initial={{ opacity: 0, y: 20 }}
@@ -1072,6 +1192,8 @@ export default function EditorPage() {
             )}
           </motion.div>
         </div>
+        )}
+          </>
         )}
       </div>
 

@@ -37,7 +37,7 @@ export default function LoginPage() {
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.token) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify({ 
           id: data.userId, 
@@ -47,10 +47,18 @@ export default function LoginPage() {
         }));
         router.push('/editor');
       } else {
-        setError(data.error || 'Login failed');
+        // Handle specific error messages
+        if (response.status === 401) {
+          setError('Invalid email or password. Please check your credentials.');
+        } else if (response.status === 404) {
+          setError('No account found with this email address.');
+        } else {
+          setError(data.error || 'Login failed. Please try again.');
+        }
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      console.error('Login error:', error);
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
