@@ -1,18 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Remove experimental features that can cause build issues
-  output: 'standalone',
+  // Optimize for Vercel deployment
   trailingSlash: false,
   generateEtags: false,
+  poweredByHeader: false,
   
-  // Optimize for Vercel deployment
+  // Image optimization
   images: {
-    unoptimized: true
-  },
-  
-  // Environment-specific configuration
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
+    unoptimized: true,
+    domains: []
   },
   
   // Only add no-cache headers in development
@@ -35,12 +31,22 @@ const nextConfig = {
   
   // Webpack configuration for better compatibility
   webpack: (config, { isServer }) => {
+    // Fix for packages that depend on fs module
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
         net: false,
         tls: false,
+        crypto: false,
+        stream: false,
+        url: false,
+        zlib: false,
+        http: false,
+        https: false,
+        assert: false,
+        os: false,
+        path: false
       };
     }
     return config;
