@@ -44,23 +44,20 @@ export default function SignupClient() {
     }
 
     try {
-      const api = 'https://planix-production-5228.up.railway.app';  // Revert to production URL
-      const response = await fetch(`${api}/api/auth/register`, {
+      const { apiRequest, apiEndpoints } = await import('../../utils/api');
+      
+      const data = await apiRequest(apiEndpoints.register, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          name: name.trim(), 
-          email: email.trim().toLowerCase(), 
-          password, 
-          referralCode: referralCode.trim() || undefined 
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          referralCode: referralCode.trim() || undefined
         }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      // API request already handles errors and parsing
+      if (data.token) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify({ 
           id: data.userId, 

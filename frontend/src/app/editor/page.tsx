@@ -67,7 +67,7 @@ export default function EditorPage() {
     }
 
     // Fetch fresh user data
-    const api = 'https://planix-production-5228.up.railway.app';
+    const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     fetch(`${api}/api/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
