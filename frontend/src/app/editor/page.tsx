@@ -192,6 +192,14 @@ export default function EditorPage() {
     } catch (error: any) {
       console.error('Generation error:', error);
       
+      // Log full error details for debugging
+      console.error('Full error object:', {
+        message: error.message,
+        response: error.response,
+        status: error.status,
+        statusText: error.statusText
+      });
+      
       // Show specific error messages based on the response
       let errorMessage = 'Failed to generate floor plan. Please try again.';
       
@@ -201,6 +209,8 @@ export default function EditorPage() {
         errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
       } else if (error.message?.includes('timeout')) {
         errorMessage = 'Request timed out. The AI is taking longer than usual. Please try again.';
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = 'Network error: Unable to reach the backend server. Please check if the server is running.';
       }
       
       // If it's an upgrade required error, show upgrade option
