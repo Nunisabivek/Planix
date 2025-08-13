@@ -58,6 +58,7 @@ export default function EditorPage() {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
+  const advancedCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const router = useRouter();
 
   // Initialize canvas
@@ -499,7 +500,7 @@ export default function EditorPage() {
     }
   };
 
-  const exportProject = async (format?: string) => {
+  const exportProject = async (format?: string, advCanvas?: HTMLCanvasElement | null) => {
     if (!floorPlan) {
       alert('No floor plan to export');
       return;
@@ -510,7 +511,7 @@ export default function EditorPage() {
       try {
         const { FloorPlanExporter } = await import('../../utils/exportUtils');
         
-        const canvasElement = useAdvancedEditor ? null : canvasRef.current;
+        const canvasElement = useAdvancedEditor ? advCanvas || null : canvasRef.current;
         
         await FloorPlanExporter.exportFloorPlan(
           format,
@@ -803,6 +804,7 @@ export default function EditorPage() {
               onSave={saveProject}
               onExport={exportProject}
               className="h-full"
+              onCanvasReady={(c) => { advancedCanvasRef.current = c; }}
             />
           </motion.div>
         ) : (
@@ -1279,7 +1281,7 @@ export default function EditorPage() {
         onClose={() => setShowExportModal(false)}
         floorPlan={floorPlan}
         analysisData={analysisResults}
-        canvasElement={useAdvancedEditor ? null : canvasRef.current}
+        canvasElement={useAdvancedEditor ? advancedCanvasRef.current : canvasRef.current}
         projectName={currentProject?.name || 'floor-plan'}
         isPro={user?.plan === 'PRO'}
       />

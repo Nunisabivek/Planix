@@ -22,8 +22,9 @@ interface Layer {
 interface AdvancedEditorProps {
   floorPlan?: any;
   onSave?: (data: any) => void;
-  onExport?: (format: string) => void;
+  onExport?: (format: string, canvas?: HTMLCanvasElement | null) => void;
   className?: string;
+  onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 const tools: Tool[] = [
@@ -50,7 +51,7 @@ const defaultLayers: Layer[] = [
   { id: 'structural', name: 'Structural', visible: true, locked: false, color: '#6b7280' },
 ];
 
-export default function AdvancedEditor({ floorPlan, onSave, onExport, className }: AdvancedEditorProps) {
+export default function AdvancedEditor({ floorPlan, onSave, onExport, className, onCanvasReady }: AdvancedEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
   const [activeTool, setActiveTool] = useState<string>('select');
@@ -75,6 +76,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
         backgroundColor: '#ffffff',
         selection: true,
       });
+      if (onCanvasReady) onCanvasReady(canvasRef.current);
 
       // Add grid
       if (gridVisible) {
@@ -87,6 +89,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
 
     return () => {
       fabricCanvas.current?.dispose();
+      if (onCanvasReady) onCanvasReady(null);
     };
   }, []);
 
@@ -548,9 +551,8 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
   };
 
   const exportProject = (format: string) => {
-    if (!fabricCanvas.current || !onExport) return;
-
-    onExport(format);
+    if (!onExport) return;
+    onExport(format, canvasRef.current);
   };
 
   return (

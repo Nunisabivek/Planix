@@ -41,16 +41,12 @@ export class FloorPlanExporter {
       pdf.text(`Floors: ${floorPlan.metadata.floors || 1}`, 20, 75);
     }
 
-    // Add floor plan image
+    // Add floor plan image directly from the provided canvas
     try {
-      const canvas = await html2canvas(canvasElement, {
-        background: '#ffffff'
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = 250;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+      const imgData = canvasElement.toDataURL('image/png');
+      const imgWidth = 250; // mm
+      const imgHeight = (canvasElement.height * imgWidth) / canvasElement.width;
+
       pdf.addPage();
       pdf.setFontSize(16);
       pdf.text('Floor Plan Layout', 20, 20);
@@ -174,14 +170,10 @@ export class FloorPlanExporter {
     }
 
     try {
-      const canvas = await html2canvas(canvasElement, {
-        background: '#ffffff'
-      });
-
-      // Create download link
+      // Create download link directly from the canvas element
       const link = document.createElement('a');
       link.download = `floor-plan-${Date.now()}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = canvasElement.toDataURL('image/png');
       link.click();
     } catch (error) {
       console.error('Error exporting PNG:', error);
