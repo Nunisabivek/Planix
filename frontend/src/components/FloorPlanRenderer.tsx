@@ -93,7 +93,7 @@ export default function FloorPlanRenderer({
     const bounds = calculateBounds(floorPlan);
     const scaleX = (width - 100) / bounds.width;
     const scaleY = (height - 100) / bounds.height;
-    const autoScale = Math.min(scaleX, scaleY, 1);
+    const autoScale = Math.min(scaleX, scaleY, 50); // Increased max scale from 1 to 50
     
     setScale(autoScale);
     setOffset({

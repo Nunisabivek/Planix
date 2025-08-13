@@ -63,16 +63,65 @@ export default function EditorPage() {
 
   // Initialize canvas
   useEffect(() => {
-    if (canvasRef.current) {
+    if (canvasRef.current && !fabricCanvas.current) {
       fabricCanvas.current = new fabric.Canvas(canvasRef.current, {
         width: 800,
         height: 600,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#ffffff',
+        selection: true,
+        preserveObjectStacking: true,
+      });
+
+      // Enable pan functionality
+      let isDragging = false;
+      let lastPosX = 0;
+      let lastPosY = 0;
+
+      fabricCanvas.current.on('mouse:down', function(opt) {
+        const evt = opt.e as MouseEvent;
+        if (evt.altKey === true) {
+          isDragging = true;
+          fabricCanvas.current!.selection = false;
+          lastPosX = evt.clientX;
+          lastPosY = evt.clientY;
+        }
+      });
+
+      fabricCanvas.current.on('mouse:move', function(opt) {
+        if (isDragging) {
+          const evt = opt.e as MouseEvent;
+          const vpt = fabricCanvas.current!.viewportTransform!;
+          vpt[4] += evt.clientX - lastPosX;
+          vpt[5] += evt.clientY - lastPosY;
+          fabricCanvas.current!.requestRenderAll();
+          lastPosX = evt.clientX;
+          lastPosY = evt.clientY;
+        }
+      });
+
+      fabricCanvas.current.on('mouse:up', function(opt) {
+        isDragging = false;
+        fabricCanvas.current!.selection = true;
+      });
+
+      // Enable zoom with mouse wheel
+      fabricCanvas.current.on('mouse:wheel', function(opt) {
+        const delta = opt.e.deltaY;
+        let zoom = fabricCanvas.current!.getZoom();
+        zoom *= 0.999 ** delta;
+        if (zoom > 20) zoom = 20;
+        if (zoom < 0.01) zoom = 0.01;
+        fabricCanvas.current!.zoomToPoint(new fabric.Point(opt.e.offsetX, opt.e.offsetY), zoom);
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
       });
     }
 
     return () => {
-      fabricCanvas.current?.dispose();
+      if (fabricCanvas.current) {
+        fabricCanvas.current.dispose();
+        fabricCanvas.current = null;
+      }
     };
   }, []);
 
@@ -247,75 +296,116 @@ export default function EditorPage() {
     // Clear canvas
     fabricCanvas.current.clear();
 
-    // Render rooms
-    if (plan.rooms) {
+    // Calculate bounds and scale to fit canvas
+    let minX = 0, minY = 0, maxX = 10, maxY = 10;
+    if (plan.rooms && plan.rooms.length > 0) {
       plan.rooms.forEach((room: any) => {
+        minX = Math.min(minX, room.dimensions.x);
+        minY = Math.min(minY, room.dimensions.y);
+        maxX = Math.max(maxX, room.dimensions.x + room.dimensions.width);
+        maxY = Math.max(maxY, room.dimensions.y + room.dimensions.height);
+      });
+    }
+
+    const planWidth = maxX - minX;
+    const planHeight = maxY - minY;
+    const scaleX = 700 / planWidth;  // Leave margin
+    const scaleY = 500 / planHeight;
+    const scale = Math.min(scaleX, scaleY, 50); // Max scale of 50
+
+    const offsetX = 50 - (minX * scale);
+    const offsetY = 50 - (minY * scale);
+
+    // Render rooms with proper scaling
+    if (plan.rooms) {
+      plan.rooms.forEach((room: any, index: number) => {
+        const roomColors = [
+          { fill: 'rgba(59, 130, 246, 0.1)', stroke: '#3b82f6' },
+          { fill: 'rgba(16, 185, 129, 0.1)', stroke: '#10b981' },
+          { fill: 'rgba(245, 158, 11, 0.1)', stroke: '#f59e0b' },
+          { fill: 'rgba(239, 68, 68, 0.1)', stroke: '#ef4444' },
+          { fill: 'rgba(139, 92, 246, 0.1)', stroke: '#8b5cf6' },
+        ];
+        const color = roomColors[index % roomColors.length];
+
         const rect = new fabric.Rect({
-          left: room.dimensions.x * 50,
-          top: room.dimensions.y * 50,
-          width: room.dimensions.width * 50,
-          height: room.dimensions.height * 50,
-          fill: 'rgba(59, 130, 246, 0.1)',
-          stroke: '#3b82f6',
+          left: room.dimensions.x * scale + offsetX,
+          top: room.dimensions.y * scale + offsetY,
+          width: room.dimensions.width * scale,
+          height: room.dimensions.height * scale,
+          fill: color.fill,
+          stroke: color.stroke,
           strokeWidth: 2,
           rx: 4,
           ry: 4,
+          selectable: true,
+          hasControls: true,
         });
         
-        const label = new fabric.Textbox(room.label, {
-          left: room.dimensions.x * 50 + 10,
-          top: room.dimensions.y * 50 + 10,
-          fontSize: 14,
+        const label = new fabric.Textbox(room.label || `Room ${index + 1}`, {
+          left: room.dimensions.x * scale + offsetX + 5,
+          top: room.dimensions.y * scale + offsetY + 5,
+          fontSize: Math.max(10, scale / 4),
           fontFamily: 'Inter',
           fill: '#1e293b',
           fontWeight: 'bold',
+          width: room.dimensions.width * scale - 10,
+          selectable: true,
         });
         
         fabricCanvas.current?.add(rect, label);
       });
     }
 
-    // Render walls
+    // Render walls with proper scaling
     if (plan.walls) {
       plan.walls.forEach((wall: any) => {
-        const line = new fabric.Line(
-          [wall.from.x * 50, wall.from.y * 50, wall.to.x * 50, wall.to.y * 50],
-          {
-            stroke: '#374151',
-            strokeWidth: 6,
-          }
-        );
+        const line = new fabric.Line([
+          wall.from.x * scale + offsetX,
+          wall.from.y * scale + offsetY,
+          wall.to.x * scale + offsetX,
+          wall.to.y * scale + offsetY
+        ], {
+          stroke: '#374151',
+          strokeWidth: Math.max(2, scale / 10),
+          selectable: true,
+        });
         fabricCanvas.current?.add(line);
       });
     }
 
-    // Render utilities
+    // Render utilities with proper scaling
     if (plan.utilities) {
       plan.utilities.forEach((utility: any) => {
         const rect = new fabric.Rect({
-          left: utility.area.x * 50,
-          top: utility.area.y * 50,
-          width: utility.area.width * 50,
-          height: utility.area.height * 50,
+          left: utility.area.x * scale + offsetX,
+          top: utility.area.y * scale + offsetY,
+          width: utility.area.width * scale,
+          height: utility.area.height * scale,
           fill: utility.type === 'plumbing' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(245, 158, 11, 0.3)',
           stroke: utility.type === 'plumbing' ? '#3b82f6' : '#f59e0b',
           strokeDashArray: [5, 5],
           strokeWidth: 2,
+          selectable: true,
         });
         
-        const label = new fabric.Textbox(utility.note, {
-          left: utility.area.x * 50 + 5,
-          top: utility.area.y * 50 + 5,
-          fontSize: 11,
+        const label = new fabric.Textbox(utility.note || 'Utility', {
+          left: utility.area.x * scale + offsetX + 2,
+          top: utility.area.y * scale + offsetY + 2,
+          fontSize: Math.max(8, scale / 6),
           fontFamily: 'Inter',
           fill: '#374151',
+          width: utility.area.width * scale - 4,
+          selectable: true,
         });
         
         fabricCanvas.current?.add(rect, label);
       });
     }
 
+    // Fit to view
     fabricCanvas.current.renderAll();
+    fabricCanvas.current.calcOffset();
   };
 
   const handleAnalyze = async () => {
@@ -1148,15 +1238,21 @@ export default function EditorPage() {
               
               <div className="rounded-lg" style={{ minHeight: '600px' }}>
                 {floorPlan ? (
-                  <FloorPlanRenderer 
-                    floorPlan={floorPlan}
-                    width={800}
-                    height={600}
-                    showGrid={true}
-                    showDimensions={true}
-                    interactive={true}
-                    aiProvider={aiProvider}
-                  />
+                  <div 
+                    onClick={() => setUseAdvancedEditor(true)}
+                    className="cursor-pointer hover:ring-2 hover:ring-blue-500 rounded-lg transition-all"
+                    title="Click to open in Advanced Editor"
+                  >
+                    <FloorPlanRenderer 
+                      floorPlan={floorPlan}
+                      width={800}
+                      height={600}
+                      showGrid={true}
+                      showDimensions={true}
+                      interactive={true}
+                      aiProvider={aiProvider}
+                    />
+                  </div>
                 ) : (
                   <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center" style={{ minHeight: '600px' }}>
                     <div className="text-center">
@@ -1278,18 +1374,28 @@ export default function EditorPage() {
                 )}
               </div>
               
-              <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center" style={{ minHeight: '600px' }}>
+              <div className="bg-white rounded-lg border" style={{ minHeight: '600px' }}>
                 {floorPlan ? (
-                  <canvas ref={canvasRef} className="border border-gray-300 rounded bg-white shadow-sm" />
+                  <div className="h-full w-full relative">
+                    <canvas 
+                      ref={canvasRef} 
+                      width={800} 
+                      height={600}
+                      className="w-full h-full border-0 rounded" 
+                      style={{ background: '#ffffff' }}
+                    />
+                  </div>
                 ) : (
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="text-2xl">📐</span>
+                  <div className="flex items-center justify-center h-full text-center p-8">
+                    <div>
+                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">📐</span>
+                      </div>
+                      <p className="text-muted-foreground mb-2">Design Canvas</p>
+                      <p className="text-sm text-muted-foreground">
+                        Generate a floor plan to see it rendered here for editing
+                      </p>
                     </div>
-                    <p className="text-muted-foreground mb-2">No floor plan generated yet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Enter a description and click "Generate Plan" to get started
-                    </p>
                   </div>
                 )}
               </div>

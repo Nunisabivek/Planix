@@ -263,6 +263,10 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
         setIsDrawing(false);
         break;
       }
+      case 'dimension': {
+        // Will be handled in mouse up for two-point dimension
+        break;
+      }
     }
   }, [activeTool, gridSize]);
 
@@ -282,11 +286,17 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
     fabricCanvas.current.requestRenderAll();
   }, [isDrawing, activeTool, gridSize]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((opt: any) => {
+    if (activeTool === 'dimension' && startPoint.current && fabricCanvas.current) {
+      const p = fabricCanvas.current.getPointer(opt.e);
+      const endPoint = { x: snap(p.x), y: snap(p.y) };
+      addDimension(startPoint.current, endPoint);
+    }
+    
     setIsDrawing(false);
     startPoint.current = null;
     tempObject.current = null;
-  }, []);
+  }, [activeTool, addDimension, snap]);
 
   const startDrawingWall = useCallback((pointer: any) => {}, []);
 
@@ -342,6 +352,65 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
     });
 
     fabricCanvas.current.add(text);
+  }, []);
+
+  const addDimension = useCallback((from: any, to: any) => {
+    if (!fabricCanvas.current) return;
+
+    const distance = Math.sqrt(Math.pow(to.x - from.x, 2) + Math.pow(to.y - from.y, 2));
+    const realDistance = (distance / 50).toFixed(2); // Assuming 50px = 1m
+
+    // Dimension line
+    const line = new fabric.Line([from.x, from.y, to.x, to.y], {
+      stroke: '#8b5cf6',
+      strokeWidth: 1,
+      selectable: true,
+      layer: 'dimensions',
+    });
+
+    // Dimension text
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const text = new fabric.Text(`${realDistance}m`, {
+      left: midX,
+      top: midY - 10,
+      fontSize: 12,
+      fontFamily: 'Inter',
+      fill: '#8b5cf6',
+      selectable: true,
+      layer: 'dimensions',
+    });
+
+    // Extension lines
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const perpAngle = angle + Math.PI / 2;
+    const extLength = 10;
+
+    const ext1 = new fabric.Line([
+      from.x - Math.cos(perpAngle) * extLength,
+      from.y - Math.sin(perpAngle) * extLength,
+      from.x + Math.cos(perpAngle) * extLength,
+      from.y + Math.sin(perpAngle) * extLength
+    ], {
+      stroke: '#8b5cf6',
+      strokeWidth: 1,
+      selectable: true,
+      layer: 'dimensions',
+    });
+
+    const ext2 = new fabric.Line([
+      to.x - Math.cos(perpAngle) * extLength,
+      to.y - Math.sin(perpAngle) * extLength,
+      to.x + Math.cos(perpAngle) * extLength,
+      to.y + Math.sin(perpAngle) * extLength
+    ], {
+      stroke: '#8b5cf6',
+      strokeWidth: 1,
+      selectable: true,
+      layer: 'dimensions',
+    });
+
+    fabricCanvas.current.add(line, text, ext1, ext2);
   }, []);
 
   const loadFloorPlan = useCallback((plan: any) => {
@@ -447,13 +516,20 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
     setActiveTool(toolId);
     
     if (fabricCanvas.current) {
-      fabricCanvas.current.defaultCursor = tools.find(t => t.id === toolId)?.cursor || 'default';
+      const tool = tools.find(t => t.id === toolId);
+      fabricCanvas.current.defaultCursor = tool?.cursor || 'default';
+      
+      // Reset canvas interaction modes
+      fabricCanvas.current.isDrawingMode = false;
       
       if (toolId === 'select') {
         fabricCanvas.current.selection = true;
         fabricCanvas.current.forEachObject((obj) => {
           obj.selectable = true;
         });
+      } else if (toolId === 'pan') {
+        fabricCanvas.current.selection = false;
+        fabricCanvas.current.defaultCursor = 'grab';
       } else {
         fabricCanvas.current.selection = false;
         fabricCanvas.current.discardActiveObject();
@@ -643,35 +719,57 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={duplicateSelected}
-              disabled={selectedObjects.length === 0}
-              className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 rounded"
-            >
-              Duplicate
-            </button>
-            <button
-              onClick={deleteSelected}
-              disabled={selectedObjects.length === 0}
-              className="px-3 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 rounded"
-            >
-              Delete
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <button
-              onClick={saveProject}
-              className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => exportProject('pdf')}
-              className="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white rounded"
-            >
-              Export
-            </button>
-          </div>
+                      <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleZoom('fit')}
+                className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+                title="Zoom to Fit"
+              >
+                🔍 Fit
+              </button>
+              <button
+                onClick={() => {
+                  if (fabricCanvas.current) {
+                    fabricCanvas.current.setZoom(1);
+                    fabricCanvas.current.setViewportTransform([1, 0, 0, 1, 0, 0]);
+                  }
+                }}
+                className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+                title="Reset View"
+              >
+                🎯 Reset
+              </button>
+              <div className="h-6 w-px bg-gray-300" />
+              <button
+                onClick={duplicateSelected}
+                disabled={selectedObjects.length === 0}
+                className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 rounded"
+                title="Duplicate Selected"
+              >
+                📋 Copy
+              </button>
+              <button
+                onClick={deleteSelected}
+                disabled={selectedObjects.length === 0}
+                className="px-2 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 rounded"
+                title="Delete Selected"
+              >
+                🗑️ Delete
+              </button>
+              <div className="h-6 w-px bg-gray-300" />
+              <button
+                onClick={saveProject}
+                className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded"
+              >
+                💾 Save
+              </button>
+              <button
+                onClick={() => exportProject('pdf')}
+                className="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white rounded"
+              >
+                📤 Export
+              </button>
+            </div>
         </motion.div>
 
         {/* Canvas Container */}
