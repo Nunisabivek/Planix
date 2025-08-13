@@ -29,6 +29,9 @@ interface AdvancedEditorProps {
 
 const tools: Tool[] = [
   { id: 'select', name: 'Select', icon: '↖️', cursor: 'default', description: 'Select and move objects' },
+  { id: 'line', name: 'Line', icon: '〣', cursor: 'crosshair', description: 'Draw line (L)' },
+  { id: 'circle', name: 'Circle', icon: '⚪', cursor: 'crosshair', description: 'Draw circle (C)' },
+  { id: 'rect', name: 'Rectangle', icon: '⬛', cursor: 'crosshair', description: 'Draw rectangle (R)' },
   { id: 'wall', name: 'Wall', icon: '📏', cursor: 'crosshair', description: 'Draw walls' },
   { id: 'room', name: 'Room', icon: '⬜', cursor: 'crosshair', description: 'Create rooms' },
   { id: 'door', name: 'Door', icon: '🚪', cursor: 'crosshair', description: 'Add doors' },
@@ -234,6 +237,26 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
     startPoint.current = { x: snap(p.x), y: snap(p.y) };
 
     switch (activeTool) {
+      case 'line': {
+        const line = new fabric.Line([startPoint.current.x, startPoint.current.y, startPoint.current.x, startPoint.current.y], {
+          stroke: '#111827', strokeWidth: 2, selectable: true, layer: 'walls'
+        });
+        tempObject.current = line;
+        fabricCanvas.current.add(line);
+        break;
+      }
+      case 'circle': {
+        const circle = new fabric.Circle({ left: startPoint.current.x, top: startPoint.current.y, radius: 1, fill: 'rgba(0,0,0,0)', stroke: '#111827', strokeWidth: 2, selectable: true });
+        tempObject.current = circle;
+        fabricCanvas.current.add(circle);
+        break;
+      }
+      case 'rect': {
+        const rect = new fabric.Rect({ left: startPoint.current.x, top: startPoint.current.y, width: 1, height: 1, fill: 'rgba(0,0,0,0)', stroke: '#111827', strokeWidth: 2, selectable: true });
+        tempObject.current = rect;
+        fabricCanvas.current.add(rect);
+        break;
+      }
       case 'wall': {
         const line = new fabric.Line([startPoint.current.x, startPoint.current.y, startPoint.current.x, startPoint.current.y], {
           stroke: '#374151', strokeWidth: 6, selectable: true, layer: 'walls'
@@ -275,13 +298,19 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
     if (!isDrawing || !startPoint.current || !tempObject.current) return;
     const p = fabricCanvas.current.getPointer(opt.e);
     const x = snap(p.x); const y = snap(p.y);
-    if (activeTool === 'wall' && tempObject.current instanceof fabric.Line) {
+    if ((activeTool === 'wall' || activeTool === 'line') && tempObject.current instanceof fabric.Line) {
       tempObject.current.set({ x2: x, y2: y });
     }
-    if (activeTool === 'room' && tempObject.current instanceof fabric.Rect) {
+    if ((activeTool === 'room' || activeTool === 'rect') && tempObject.current instanceof fabric.Rect) {
       const w = x - startPoint.current.x;
       const h = y - startPoint.current.y;
       tempObject.current.set({ width: Math.abs(w), height: Math.abs(h), left: Math.min(startPoint.current.x, x), top: Math.min(startPoint.current.y, y) });
+    }
+    if (activeTool === 'circle' && tempObject.current instanceof fabric.Circle) {
+      const dx = x - startPoint.current.x;
+      const dy = y - startPoint.current.y;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      tempObject.current.set({ radius: Math.abs(r) });
     }
     fabricCanvas.current.requestRenderAll();
   }, [isDrawing, activeTool, gridSize]);
@@ -591,6 +620,18 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
 
     fabricCanvas.current.renderAll();
   };
+
+  // Keyboard shortcuts: Delete, Ctrl+Z, Ctrl+Y
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!fabricCanvas.current) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        deleteSelected();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedObjects]);
 
   const saveProject = () => {
     if (!fabricCanvas.current || !onSave) return;

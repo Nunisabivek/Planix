@@ -720,6 +720,19 @@ app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: num
   
   // Check plan limits and credits (skip for admin)
   const planLimits = getPlanLimits(isAdmin ? 'PRO_PLUS' : user.plan);
+  // Normalize FREE defaults and credits for non-admin users
+  if (!isAdmin && user.plan === 'FREE') {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          maxProjects: 5,
+          maxGenerations: 5,
+          credits: user.credits < 0 ? 150 : user.credits,
+        },
+      });
+    } catch (_) {}
+  }
   
   // Skip limit checks for admin users
   if (!isAdmin) {
@@ -1050,36 +1063,44 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
 
   // Update user stats and credits based on plan (skip for admin)
   if (!isAdmin) {
+    // Estimate complexity cost (5–15 credits) based on room/wall count
+    const roomCount = floorPlan?.rooms?.length || 0;
+    const wallCount = floorPlan?.walls?.length || 0;
+    const sizeScore = roomCount + Math.ceil(wallCount / 4);
+    const cost = Math.min(15, Math.max(5, sizeScore));
+
     const updateData: any = {
       planGenerations: { increment: 1 }
     };
 
-    // Deduct credits for FREE users only (PRO and PRO+ have unlimited editing credits)
     if (user.plan === 'FREE') {
-      updateData.credits = { decrement: 1 };
+      updateData.credits = { decrement: cost };
     }
 
     await prisma.user.update({ 
       where: { id: userId }, 
       data: updateData 
     });
-  }
 
-  // Record usage with plan-specific details
-  await prisma.usageHistory.create({
-    data: {
-      userId,
-      action: 'generation',
-      creditsUsed: user.plan === 'FREE' ? 1 : 0,
-      details: { 
-        prompt: enhancedPrompt, 
-        requirements,
-        plan: user.plan,
-        aiProvider,
-        buildingHeight: requirements?.floors || 1
+    // Record usage with plan-specific details
+    await prisma.usageHistory.create({
+      data: {
+        userId,
+        action: 'generation',
+        creditsUsed: user.plan === 'FREE' ? cost : 0,
+        details: { 
+          prompt: enhancedPrompt, 
+          requirements,
+          plan: user.plan,
+          aiProvider,
+          buildingHeight: requirements?.floors || 1,
+          roomCount,
+          wallCount,
+          cost
+        }
       }
-    }
-  });
+    });
+  }
 
   // Save or update project if projectId provided
   let savedProject = null;
@@ -1675,6 +1696,18 @@ app.post('/api/projects', requireAuth, async (req: Request & { userId?: number }
   }
 
   try {
+    // Enforce project limits for non-admin users
+    const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+    const ADMIN_EMAILS = ['nunisaalex456@gmail.com'];
+    const isAdmin = !!user && ADMIN_EMAILS.includes(user.email);
+    if (!isAdmin) {
+      const projectCount = await prisma.project.count({ where: { userId: req.userId! } });
+      const limit = user?.maxProjects || 5;
+      if (projectCount >= limit) {
+        return res.status(402).json({ error: `Project limit reached (${limit}). Upgrade to create more projects.`, upgradeRequired: true });
+      }
+    }
+
     const project = await prisma.project.create({
       data: {
         name,
