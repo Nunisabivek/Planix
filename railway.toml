@@ -6,4 +6,4 @@ source = "backend"
 buildCommand = "npm ci --omit=dev && npm run build && npx prisma generate"
 
 [services.backend.deploy]
-startCommand = "npx prisma migrate deploy && npm start"
+startCommand = "npx prisma db push --accept-data-loss && npm start"

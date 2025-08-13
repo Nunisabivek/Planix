@@ -12,7 +12,9 @@
     "postinstall": "npx prisma generate",
     "db:setup": "npx prisma db push --accept-data-loss",
     "db:migrate": "npx prisma migrate deploy",
-    "db:deploy": "npx prisma migrate deploy"
+    "db:deploy": "npx prisma migrate deploy",
+    "db:reset": "npx prisma migrate reset --force",
+    "db:push": "npx prisma db push --accept-data-loss"
   },
   "keywords": [],
   "author": "",
