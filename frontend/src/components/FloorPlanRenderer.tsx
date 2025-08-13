@@ -93,7 +93,10 @@ export default function FloorPlanRenderer({
     const bounds = calculateBounds(floorPlan);
     const scaleX = (width - 100) / bounds.width;
     const scaleY = (height - 100) / bounds.height;
-    const autoScale = Math.min(scaleX, scaleY, 50); // Increased max scale from 1 to 50
+    // Cap auto scale to avoid gigantic text/rendering when plans are very small
+    // Keep between 0.5x and 3x for predictable visual size
+    const rawScale = Math.min(scaleX, scaleY);
+    const autoScale = Math.max(0.5, Math.min(rawScale, 3));
     
     setScale(autoScale);
     setOffset({
@@ -248,7 +251,9 @@ export default function FloorPlanRenderer({
 
       // Room label
       ctx.fillStyle = '#1f2937';
-      ctx.font = `${Math.max(12, 8 * scale)}px Arial`;
+      // Use clamped font sizes so labels never explode visually
+      const labelFontPx = Math.max(12, Math.min(18, 10 + (scale - 1) * 4));
+      ctx.font = `${labelFontPx}px Arial`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
@@ -260,12 +265,14 @@ export default function FloorPlanRenderer({
       
       // Room area
       if (room.area) {
-        ctx.font = `${Math.max(10, 6 * scale)}px Arial`;
+        const areaFontPx = Math.max(10, Math.min(14, 9 + (scale - 1) * 3));
+        ctx.font = `${areaFontPx}px Arial`;
         ctx.fillStyle = '#6b7280';
         ctx.fillText(`${room.area.toFixed(1)}m²`, centerX, centerY + 8);
       } else {
         const area = room.dimensions.width * room.dimensions.height;
-        ctx.font = `${Math.max(10, 6 * scale)}px Arial`;
+        const areaFontPx = Math.max(10, Math.min(14, 9 + (scale - 1) * 3));
+        ctx.font = `${areaFontPx}px Arial`;
         ctx.fillStyle = '#6b7280';
         ctx.fillText(`${area.toFixed(1)}m²`, centerX, centerY + 8);
       }
