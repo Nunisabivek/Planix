@@ -62,6 +62,9 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedObjects, setSelectedObjects] = useState<fabric.Object[]>([]);
   const [properties, setProperties] = useState<any>({});
+  const startPoint = useRef<{ x: number; y: number } | null>(null);
+  const tempObject = useRef<fabric.Object | null>(null);
+  const isPanning = useRef<boolean>(false);
 
   // Initialize canvas
   useEffect(() => {
@@ -191,79 +194,100 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className 
       opt.e.preventDefault();
       opt.e.stopPropagation();
     });
+
+    // Enable panning when tool is pan
+    canvas.on('mouse:down', (opt) => {
+      if (activeTool === 'pan') {
+        isPanning.current = true;
+        canvas.setCursor('grabbing');
+      }
+    });
+    canvas.on('mouse:move', (opt) => {
+      if (activeTool === 'pan' && isPanning.current) {
+        const e = opt.e as MouseEvent;
+        const vpt = canvas.viewportTransform!;
+        vpt[4] += e.movementX;
+        vpt[5] += e.movementY;
+        canvas.requestRenderAll();
+      }
+    });
+    canvas.on('mouse:up', () => {
+      if (activeTool === 'pan') {
+        isPanning.current = false;
+        canvas.setCursor('move');
+      }
+    });
   }, []);
 
+  const snap = (v: number) => Math.round(v / gridSize) * gridSize;
+
   const handleMouseDown = useCallback((opt: any) => {
-    if (activeTool === 'select') return;
+    if (!fabricCanvas.current) return;
+    if (activeTool === 'select' || activeTool === 'pan') return;
 
-    const pointer = fabricCanvas.current?.getPointer(opt.e);
-    if (!pointer) return;
-
+    const p = fabricCanvas.current.getPointer(opt.e);
+    if (!p) return;
     setIsDrawing(true);
+    startPoint.current = { x: snap(p.x), y: snap(p.y) };
 
     switch (activeTool) {
-      case 'wall':
-        startDrawingWall(pointer);
+      case 'wall': {
+        const line = new fabric.Line([startPoint.current.x, startPoint.current.y, startPoint.current.x, startPoint.current.y], {
+          stroke: '#374151', strokeWidth: 6, selectable: true, layer: 'walls'
+        });
+        tempObject.current = line;
+        fabricCanvas.current.add(line);
         break;
-      case 'room':
-        startDrawingRoom(pointer);
+      }
+      case 'room': {
+        const rect = new fabric.Rect({ left: startPoint.current.x, top: startPoint.current.y, width: 1, height: 1, fill: 'rgba(59,130,246,0.08)', stroke: '#3b82f6', strokeWidth: 2, selectable: true, layer: 'rooms' });
+        tempObject.current = rect;
+        fabricCanvas.current.add(rect);
         break;
-      case 'door':
-        addDoor(pointer);
+      }
+      case 'door': {
+        addDoor(startPoint.current);
+        setIsDrawing(false);
         break;
-      case 'window':
-        addWindow(pointer);
+      }
+      case 'window': {
+        addWindow(startPoint.current);
+        setIsDrawing(false);
         break;
-      case 'text':
-        addText(pointer);
+      }
+      case 'text': {
+        addText(startPoint.current);
+        setIsDrawing(false);
         break;
+      }
     }
-  }, [activeTool]);
+  }, [activeTool, gridSize]);
 
   const handleMouseMove = useCallback((opt: any) => {
-    if (!isDrawing || activeTool === 'select') return;
-
-    const pointer = fabricCanvas.current?.getPointer(opt.e);
-    if (!pointer) return;
-
-    // Handle drawing updates
-    // Implementation depends on active tool
-  }, [isDrawing, activeTool]);
+    if (!fabricCanvas.current) return;
+    if (!isDrawing || !startPoint.current || !tempObject.current) return;
+    const p = fabricCanvas.current.getPointer(opt.e);
+    const x = snap(p.x); const y = snap(p.y);
+    if (activeTool === 'wall' && tempObject.current instanceof fabric.Line) {
+      tempObject.current.set({ x2: x, y2: y });
+    }
+    if (activeTool === 'room' && tempObject.current instanceof fabric.Rect) {
+      const w = x - startPoint.current.x;
+      const h = y - startPoint.current.y;
+      tempObject.current.set({ width: Math.abs(w), height: Math.abs(h), left: Math.min(startPoint.current.x, x), top: Math.min(startPoint.current.y, y) });
+    }
+    fabricCanvas.current.requestRenderAll();
+  }, [isDrawing, activeTool, gridSize]);
 
   const handleMouseUp = useCallback(() => {
     setIsDrawing(false);
+    startPoint.current = null;
+    tempObject.current = null;
   }, []);
 
-  const startDrawingWall = useCallback((pointer: any) => {
-    if (!fabricCanvas.current) return;
+  const startDrawingWall = useCallback((pointer: any) => {}, []);
 
-    const wall = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
-      stroke: '#374151',
-      strokeWidth: 8,
-      selectable: true,
-      layer: 'walls',
-    });
-
-    fabricCanvas.current.add(wall);
-  }, []);
-
-  const startDrawingRoom = useCallback((pointer: any) => {
-    if (!fabricCanvas.current) return;
-
-    const room = new fabric.Rect({
-      left: pointer.x,
-      top: pointer.y,
-      width: 100,
-      height: 100,
-      fill: 'rgba(59, 130, 246, 0.1)',
-      stroke: '#3b82f6',
-      strokeWidth: 2,
-      selectable: true,
-      layer: 'rooms',
-    });
-
-    fabricCanvas.current.add(room);
-  }, []);
+  const startDrawingRoom = useCallback((pointer: any) => {}, []);
 
   const addDoor = useCallback((pointer: any) => {
     if (!fabricCanvas.current) return;
