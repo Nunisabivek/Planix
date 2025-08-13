@@ -11,6 +11,143 @@ export interface ExportOptions {
 }
 
 export class FloorPlanExporter {
+  // Render a high-resolution, offscreen canvas of the given floor plan
+  private static renderOffscreenCanvas(
+    floorPlan: any,
+    widthPx = 1600,
+    heightPx = 1200,
+    opts: { showGrid?: boolean; showDimensions?: boolean } = { showGrid: true, showDimensions: true }
+  ): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = widthPx;
+    canvas.height = heightPx;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+
+    // Helper: bounds
+    const calculateBounds = (plan: any) => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      const rooms = plan?.rooms ?? [];
+      rooms.forEach((room: any) => {
+        const { x, y, width, height } = room.dimensions;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + width);
+        maxY = Math.max(maxY, y + height);
+      });
+      return {
+        minX: minX === Infinity ? 0 : minX,
+        minY: minY === Infinity ? 0 : minY,
+        width: maxX === -Infinity ? 10 : maxX - (minX === Infinity ? 0 : minX),
+        height: maxY === -Infinity ? 10 : maxY - (minY === Infinity ? 0 : minY)
+      };
+    };
+
+    const bounds = calculateBounds(floorPlan);
+    const scaleX = (widthPx - 120) / bounds.width;
+    const scaleY = (heightPx - 120) / bounds.height;
+    const rawScale = Math.min(scaleX, scaleY);
+    const scale = Math.max(0.5, Math.min(rawScale, 3));
+    const offset = {
+      x: (widthPx - bounds.width * scale) / 2 - bounds.minX * scale,
+      y: (heightPx - bounds.height * scale) / 2 - bounds.minY * scale,
+    } as any;
+
+    // Grid
+    if (opts.showGrid) {
+      ctx.strokeStyle = '#eef2f7';
+      ctx.lineWidth = 1;
+      const targetPixels = 40;
+      const worldStepRaw = targetPixels / scale;
+      const worldStep = Math.max(0.5, Math.round(worldStepRaw * 2) / 2);
+      const stepPx = worldStep * scale;
+      const startX = offset.x % stepPx;
+      const startY = offset.y % stepPx;
+      for (let x = startX; x < widthPx; x += stepPx) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, heightPx); ctx.stroke();
+      }
+      for (let y = startY; y < heightPx; y += stepPx) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(widthPx, y); ctx.stroke();
+      }
+    }
+
+    // Walls
+    if (floorPlan?.walls) {
+      floorPlan.walls.forEach((wall: any) => {
+        const thickness = (wall.thickness || 0.2) * scale;
+        ctx.strokeStyle = wall.type === 'load_bearing' ? '#2d3748' : '#4a5568';
+        ctx.lineWidth = Math.max(2, thickness);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(wall.from.x * scale + offset.x, wall.from.y * scale + offset.y);
+        ctx.lineTo(wall.to.x * scale + offset.x, wall.to.y * scale + offset.y);
+        ctx.stroke();
+      });
+    }
+
+    // Rooms
+    (floorPlan?.rooms ?? []).forEach((room: any) => {
+      const x = room.dimensions.x * scale + offset.x;
+      const y = room.dimensions.y * scale + offset.y;
+      const w = room.dimensions.width * scale;
+      const h = room.dimensions.height * scale;
+      const roomColors: Record<string, { fill: string; stroke: string }> = {
+        living_room: { fill: '#fef3c7', stroke: '#f59e0b' },
+        kitchen: { fill: '#dbeafe', stroke: '#3b82f6' },
+        bedroom: { fill: '#fce7f3', stroke: '#ec4899' },
+        master_bedroom: { fill: '#fce7f3', stroke: '#be185d' },
+        bathroom: { fill: '#e0f2fe', stroke: '#0891b2' },
+        dining: { fill: '#f3e8ff', stroke: '#8b5cf6' },
+        study: { fill: '#ecfdf5', stroke: '#10b981' },
+        balcony: { fill: '#fff7ed', stroke: '#ea580c' },
+        garage: { fill: '#f1f5f9', stroke: '#475569' },
+        utility: { fill: '#fafafa', stroke: '#737373' },
+        entrance: { fill: '#fdf4ff', stroke: '#a855f7' },
+        staircase: { fill: '#f8fafc', stroke: '#64748b' },
+        default: { fill: '#f9fafb', stroke: '#6b7280' },
+      };
+      const colors = roomColors[room.type] || roomColors.default;
+      ctx.fillStyle = colors.fill; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = colors.stroke; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+      // Label
+      const labelFontPx = Math.max(12, Math.min(18, 10 + (scale - 1) * 4));
+      ctx.fillStyle = '#1f2937';
+      ctx.font = `${labelFontPx}px Arial`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const cx = x + w / 2; const cy = y + h / 2;
+      ctx.fillText(room.label || 'Room', cx, cy - 8);
+      if (opts.showDimensions) {
+        const areaFontPx = Math.max(10, Math.min(14, 9 + (scale - 1) * 3));
+        ctx.font = `${areaFontPx}px Arial`; ctx.fillStyle = '#6b7280';
+        const area = room.area || (room.dimensions.width * room.dimensions.height);
+        ctx.fillText(`${area.toFixed(1)}m²`, cx, cy + 8);
+      }
+    });
+
+    // Doors
+    if (floorPlan?.doors) {
+      floorPlan.doors.forEach((door: any) => {
+        const x = door.position.x * scale + offset.x;
+        const y = door.position.y * scale + offset.y;
+        const w = door.width * scale;
+        ctx.strokeStyle = '#8b4513'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.stroke();
+      });
+    }
+
+    // Windows
+    if (floorPlan?.windows) {
+      floorPlan.windows.forEach((win: any) => {
+        const x = win.position.x * scale + offset.x;
+        const y = win.position.y * scale + offset.y;
+        const w = win.width * scale;
+        ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.stroke();
+      });
+    }
+
+    return canvas;
+  }
   
   static async exportToPDF(
     canvasElement: HTMLCanvasElement | null, 
@@ -41,18 +178,19 @@ export class FloorPlanExporter {
       pdf.text(`Floors: ${floorPlan.metadata.floors || 1}`, 20, 75);
     }
 
-    // Add floor plan image directly from the provided canvas
+    // Add floor plan image rendered offscreen (ensures non-blank output)
     try {
-      const imgData = canvasElement.toDataURL('image/png');
-      const imgWidth = 250; // mm
-      const imgHeight = (canvasElement.height * imgWidth) / canvasElement.width;
+      const offscreen = FloorPlanExporter.renderOffscreenCanvas(floorPlan, 1600, 1200, { showGrid: true, showDimensions: true });
+      const imgData = offscreen.toDataURL('image/png');
+      const imgWidth = 260; // mm
+      const imgHeight = (offscreen.height * imgWidth) / offscreen.width;
 
       pdf.addPage();
       pdf.setFontSize(16);
       pdf.text('Floor Plan Layout', 20, 20);
       pdf.addImage(imgData, 'PNG', 20, 30, imgWidth, imgHeight);
     } catch (error) {
-      console.error('Error capturing canvas:', error);
+      console.error('Error capturing floor plan:', error);
     }
 
     // Add room details
