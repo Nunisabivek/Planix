@@ -4,10 +4,12 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||
     ? 'http://localhost:8080' 
     : 'https://planix-production-5228.up.railway.app');
 
-// Debug API URL
-console.log('🔗 API_BASE_URL:', API_BASE_URL);
-console.log('🌍 Environment:', process.env.NODE_ENV);
-console.log('🔑 NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+// Debug API URL (only in development)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('🔗 API_BASE_URL:', API_BASE_URL);
+  console.log('🌍 Environment:', process.env.NODE_ENV);
+  console.log('🔑 NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+}
 
 export const apiEndpoints = {
   // Auth endpoints
@@ -43,8 +45,11 @@ export const apiEndpoints = {
 // Helper function for making API requests with proper error handling
 export async function apiRequest(url: string, options: RequestInit = {}) {
   try {
-    console.log('🌐 Making API request to:', url);
-    console.log('📋 Request options:', JSON.stringify(options, null, 2));
+    // Only detailed logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🌐 Making API request to:', url);
+      console.log('📋 Request options:', JSON.stringify(options, null, 2));
+    }
     
     const response = await fetch(url, {
       ...options,
@@ -54,8 +59,10 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
       },
     });
 
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -64,7 +71,9 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
     }
 
     const data = await response.json();
-    console.log('✅ API Success Response:', data);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ API Success Response:', data);
+    }
     return data;
   } catch (error) {
     console.error('💥 API Request Error:', error);

@@ -8,8 +8,6 @@ const nextConfig = {
   },
   trailingSlash: false,
   poweredByHeader: false,
-  output: 'export',
-  distDir: 'dist',
   
   images: {
     unoptimized: true,
