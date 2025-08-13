@@ -403,6 +403,65 @@ app.get('/api/auth/verify-email', async (req: Request, res: Response) => {
   }
 });
 
+// Resend verification email
+app.post('/api/auth/resend-verification', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body as { email: string };
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    // Respond generically to avoid user enumeration
+    if (!user) {
+      return res.status(200).json({ message: 'If an account exists, a verification email has been sent.' });
+    }
+    if (user.emailVerified) {
+      return res.status(200).json({ message: 'Email is already verified. You can login now.' });
+    }
+
+    // Optional simple throttle: if existing expiry is in the future minus 1 minute, deny
+    const now = Date.now();
+    if (user.emailVerificationExpiry && user.emailVerificationExpiry.getTime() - now > 23 * 60 * 60 * 1000) {
+      // there is a very fresh link; still send to avoid support friction
+    }
+
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerificationToken, emailVerificationExpiry }
+    });
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
+    });
+
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${emailVerificationToken}`;
+    const mailOptions = {
+      from: `Planix <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: 'Verify your Planix email (link valid 24h)',
+      html: `
+        <p>Hello ${user.name || ''},</p>
+        <p>Please verify your email by clicking the button below. This link is valid for 24 hours.</p>
+        <p><a href="${verificationUrl}" style="padding:12px 20px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">Verify Email</a></p>
+        <p>If the button doesn’t work, copy and paste this URL into your browser:<br/>${verificationUrl}</p>
+      `,
+    };
+
+    setImmediate(async () => {
+      try { await transporter.sendMail(mailOptions); } catch (e) { console.error('Resend verification failed', e); }
+    });
+
+    return res.status(200).json({ message: 'Verification email sent. Please check your inbox.' });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    return res.status(500).json({ error: 'Failed to resend verification email. Please try again.' });
+  }
+});
+
 // Login a user
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   const { email, password } = req.body as { email: string; password: string };
@@ -412,18 +471,74 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  // If not verified, proactively send fresh verification email and stop
   if (!user.emailVerified) {
-    return res.status(403).json({ error: 'Please verify your email address before logging in. Check your inbox for the verification link.' });
+    try {
+      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+      const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+      await prisma.user.update({ where: { id: user.id }, data: { emailVerificationToken, emailVerificationExpiry } });
+
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
+      });
+      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${emailVerificationToken}`;
+      const mailOptions = {
+        from: `Planix <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: 'Verify your Planix email',
+        html: `Please verify your email: <a href="${verificationUrl}">Verify Email</a> (valid 24h)`,
+      };
+      setImmediate(async () => { try { await transporter.sendMail(mailOptions); } catch (e) { console.error('Auto-resend verification failed', e); } });
+    } catch (e) {
+      console.error('Failed to prepare verification email on login', e);
+    }
+    return res.status(403).json({ error: 'Email not verified. We have sent a new verification email.' });
   }
 
   const passwordMatch = await bcrypt.compare(password, user.password);
-
-  if (passwordMatch) {
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' });
-    res.status(200).json({ message: 'Login successful', userId: user.id, token, plan: user.plan, credits: user.credits, referralCode: user.referralCode });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
+  if (!passwordMatch) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
+
+  // Generate OTP and email it; do not issue JWT yet
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+  await prisma.user.update({ where: { id: user.id }, data: { otpCode: otp, otpExpiry } });
+
+  // Send OTP email (fire-and-forget)
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
+  });
+  const mailOptions = {
+    to: user.email,
+    from: `Planix <${process.env.EMAIL_USER}>`,
+    subject: 'Your Planix login verification code',
+    text: `Your verification code is ${otp}. It expires in 10 minutes.`,
+  };
+  setImmediate(async () => {
+    try { await transporter.sendMail(mailOptions); } catch (e) { console.error('OTP email send failed', e); }
+  });
+
+  return res.status(200).json({ step: 'verify-otp', message: 'Verification code sent to your email.' });
+});
+
+// Verify OTP and issue JWT
+app.post('/api/auth/verify-otp', async (req: Request, res: Response) => {
+  const { email, otp } = req.body as { email: string; otp: string };
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !user.otpCode || !user.otpExpiry) {
+    return res.status(400).json({ error: 'Invalid verification attempt' });
+  }
+  if (user.otpCode !== otp || user.otpExpiry < new Date()) {
+    return res.status(400).json({ error: 'Invalid or expired code' });
+  }
+
+  // Clear OTP and issue token
+  await prisma.user.update({ where: { id: user.id }, data: { otpCode: null, otpExpiry: null } });
+  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' });
+  return res.status(200).json({ message: 'Login successful', userId: user.id, token, plan: user.plan, credits: user.credits, referralCode: user.referralCode });
 });
 
 // Forgot Password

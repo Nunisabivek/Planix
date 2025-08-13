@@ -11,6 +11,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [otpStep, setOtpStep] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [info, setInfo] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -29,36 +32,58 @@ export default function LoginPage() {
       const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
       const response = await fetch(`${api}/api/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
+      if (response.ok && data.step === 'verify-otp') {
+        setOtpStep(true);
+        setError('');
+        setInfo('We have sent a verification code to your email.');
+        return;
+      }
+
       if (response.ok && data.token) {
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify({ 
-          id: data.userId, 
-          plan: data.plan, 
-          credits: data.credits, 
-          referralCode: data.referralCode 
-        }));
+        localStorage.setItem('user', JSON.stringify({ id: data.userId, plan: data.plan, credits: data.credits, referralCode: data.referralCode }));
         router.push('/editor');
-      } else {
-        // Handle specific error messages
-        if (response.status === 401) {
-          setError('Invalid email or password. Please check your credentials.');
-        } else if (response.status === 404) {
-          setError('No account found with this email address.');
-        } else {
-          setError(data.error || 'Login failed. Please try again.');
-        }
+        return;
       }
+
+      if (response.status === 401) setError('Invalid email or password.');
+      else if (response.status === 404) setError('No account found with this email.');
+      else setError(data.error || 'Login failed. Please try again.');
     } catch (error) {
       console.error('Login error:', error);
       setError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    try {
+      const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const response = await fetch(`${api}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      const data = await response.json();
+      if (response.ok && data.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify({ id: data.userId, plan: data.plan, credits: data.credits, referralCode: data.referralCode }));
+        router.push('/editor');
+        return;
+      }
+      setError(data.error || 'Invalid or expired code');
+    } catch (e) {
+      setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -165,14 +190,14 @@ export default function LoginPage() {
             )}
 
             <motion.form
-              onSubmit={handleSubmit}
+              onSubmit={otpStep ? handleVerifyOtp : handleSubmit}
               className="space-y-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6, duration: 0.6 }}
             >
               <div className="space-y-4">
-                <div>
+                <div className={otpStep ? 'opacity-60 pointer-events-none' : ''}>
                   <label htmlFor="email" className="block text-sm font-medium mb-2">
                     Email Address
                   </label>
@@ -187,7 +212,7 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div>
+                <div className={otpStep ? 'hidden' : ''}>
                   <label htmlFor="password" className="block text-sm font-medium mb-2">
                     Password
                   </label>
@@ -201,6 +226,47 @@ export default function LoginPage() {
                     required
                   />
                 </div>
+
+                {otpStep && (
+                  <div>
+                    <label htmlFor="otp" className="block text-sm font-medium mb-2">
+                      Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      id="otp"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      className="input w-full tracking-widest"
+                      placeholder="Enter 6-digit code"
+                      minLength={4}
+                      maxLength={6}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">We sent a 6-digit code to your email. It expires in 10 minutes.</p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+                          const r = await fetch(`${api}/api/auth/resend-verification`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                          });
+                          const d = await r.json();
+                          setInfo(d.message || 'If the account exists, we sent a new email.');
+                        } catch {
+                          setInfo('Unable to resend now. Please try again in a moment.');
+                        }
+                      }}
+                      className="mt-3 text-sm text-primary hover:underline"
+                    >
+                      Resend verification email
+                    </button>
+                    {info && <p className="text-xs text-green-600 mt-2">{info}</p>}
+                  </div>
+                )}
               </div>
 
               <motion.button
@@ -213,11 +279,9 @@ export default function LoginPage() {
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Signing In...
+                    {otpStep ? 'Verifying...' : 'Signing In...'}
                   </div>
-                ) : (
-                  'Sign In →'
-                )}
+                ) : otpStep ? 'Verify Code →' : 'Sign In →'}
               </motion.button>
             </motion.form>
 

@@ -38,6 +38,9 @@ model User {
   emailVerified              Boolean   @default(false)
   emailVerificationToken     String?
   emailVerificationExpiry    DateTime?
+  // 2FA via email OTP
+  otpCode                    String?
+  otpExpiry                  DateTime?
   
   // Relations
   projects                   Project[]
