@@ -714,29 +714,36 @@ app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: num
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.status(404).json({ error: 'User not found' });
   
-  // Check plan limits and credits
-  const planLimits = getPlanLimits(user.plan);
+  // Special access for testing - replace with your actual email
+  const ADMIN_EMAILS = ['nunisabivek@gmail.com']; // Add your email here
+  const isAdmin = ADMIN_EMAILS.includes(user.email);
   
-  if (user.plan === 'FREE') {
-    if (user.planGenerations >= user.maxGenerations) {
+  // Check plan limits and credits (skip for admin)
+  const planLimits = getPlanLimits(isAdmin ? 'PRO_PLUS' : user.plan);
+  
+  // Skip limit checks for admin users
+  if (!isAdmin) {
+    if (user.plan === 'FREE') {
+      if (user.planGenerations >= user.maxGenerations) {
+        return res.status(402).json({ 
+          error: `Free plan limit reached. You can generate up to ${user.maxGenerations} floor plans. Upgrade to PRO for more generations.`,
+          upgradeRequired: true
+        });
+      }
+      if (user.credits <= 0) {
+        return res.status(402).json({ 
+          error: 'No editing credits remaining. Upgrade to PRO for unlimited editing.',
+          upgradeRequired: true
+        });
+      }
+    }
+    
+    if (user.plan === 'PRO' && user.planGenerations >= 20) {
       return res.status(402).json({ 
-        error: `Free plan limit reached. You can generate up to ${user.maxGenerations} floor plans. Upgrade to PRO for more generations.`,
+        error: 'PRO plan limit reached (20 plans/month). Upgrade to PRO+ for unlimited plans.',
         upgradeRequired: true
       });
     }
-    if (user.credits <= 0) {
-      return res.status(402).json({ 
-        error: 'No editing credits remaining. Upgrade to PRO for unlimited editing.',
-        upgradeRequired: true
-      });
-    }
-  }
-  
-  if (user.plan === 'PRO' && user.planGenerations >= 20) {
-    return res.status(402).json({ 
-      error: 'PRO plan limit reached (20 plans/month). Upgrade to PRO+ for unlimited plans.',
-      upgradeRequired: true
-    });
   }
 
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -1033,20 +1040,22 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
     };
   }
 
-  // Update user stats and credits based on plan
-  const updateData: any = {
-    planGenerations: { increment: 1 }
-  };
+  // Update user stats and credits based on plan (skip for admin)
+  if (!isAdmin) {
+    const updateData: any = {
+      planGenerations: { increment: 1 }
+    };
 
-  // Deduct credits for FREE users only (PRO and PRO+ have unlimited editing credits)
-  if (user.plan === 'FREE') {
-    updateData.credits = { decrement: 1 };
+    // Deduct credits for FREE users only (PRO and PRO+ have unlimited editing credits)
+    if (user.plan === 'FREE') {
+      updateData.credits = { decrement: 1 };
+    }
+
+    await prisma.user.update({ 
+      where: { id: userId }, 
+      data: updateData 
+    });
   }
-
-  await prisma.user.update({ 
-    where: { id: userId }, 
-    data: updateData 
-  });
 
   // Record usage with plan-specific details
   await prisma.usageHistory.create({
@@ -1089,13 +1098,13 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
     projectId: savedProject?.id,
     aiProvider,
     planInfo: {
-      currentPlan: user.plan,
-      generationsUsed: updatedUser?.planGenerations || 0,
-      generationsLimit: planLimits.maxGenerations,
-      creditsRemaining: user.plan === 'FREE' ? (updatedUser?.credits || 0) : 'unlimited',
+      currentPlan: isAdmin ? 'PRO_PLUS' : user.plan,
+      generationsUsed: isAdmin ? 0 : (updatedUser?.planGenerations || 0),
+      generationsLimit: isAdmin ? 'unlimited' : planLimits.maxGenerations,
+      creditsRemaining: isAdmin ? 'unlimited' : (user.plan === 'FREE' ? (updatedUser?.credits || 0) : 'unlimited'),
       projectsCreated: updatedUser?.projectsCreated || 0,
-      projectsLimit: planLimits.maxProjects,
-      canUpgrade: user.plan !== 'PRO_PLUS'
+      projectsLimit: isAdmin ? 'unlimited' : planLimits.maxProjects,
+      canUpgrade: !isAdmin && user.plan !== 'PRO_PLUS'
     },
     features: {
       has3DConversion: planLimits.has3DConversion,
@@ -1418,7 +1427,23 @@ app.post('/api/analyze-plan', requireAuth, async (req: Request & { userId?: numb
 app.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: Response) => {
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ id: user.id, email: user.email, plan: user.plan, credits: user.credits, referralCode: user.referralCode, referralDiscountEligible: user.referralDiscountEligible, referralDiscountUsed: user.referralDiscountUsed });
+  
+  // Check if admin user
+  const ADMIN_EMAILS = ['nunisabivek@gmail.com']; // Add your email here
+  const isAdmin = ADMIN_EMAILS.includes(user.email);
+  
+  res.json({ 
+    id: user.id, 
+    email: user.email, 
+    plan: isAdmin ? 'PRO_PLUS' : user.plan, 
+    credits: isAdmin ? 9999 : user.credits, 
+    planGenerations: isAdmin ? 0 : user.planGenerations,
+    maxGenerations: isAdmin ? 9999 : user.maxGenerations,
+    referralCode: user.referralCode, 
+    referralDiscountEligible: user.referralDiscountEligible, 
+    referralDiscountUsed: user.referralDiscountUsed,
+    isAdmin: isAdmin
+  });
 });
 
 // Create a Razorpay order with enhanced features

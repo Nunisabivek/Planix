@@ -112,8 +112,14 @@ export default function EditorPage() {
   const handleGenerate = async () => {
     if (!user) return;
     
+    // Check generation limits more gracefully
+    if (user.plan === 'FREE' && user.planGenerations >= user.maxGenerations) {
+      // Don't show alert, the UI will show the limit reached state
+      return;
+    }
+    
     if (user.plan !== 'PRO' && user.credits <= 0) {
-      alert('You have no credits remaining. Please buy more credits or upgrade to Pro.');
+      // Don't show alert, the UI will show the no credits state  
       return;
     }
 
@@ -589,12 +595,22 @@ export default function EditorPage() {
                 Planix
               </Link>
               <div className="hidden md:flex items-center gap-4 text-sm">
+                {user.isAdmin && (
+                  <span className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full">
+                    🚀 Admin Access
+                  </span>
+                )}
                 <span className="px-3 py-1 bg-gray-100 rounded-full">
-                  Plan: <strong className={user.plan === 'PRO' ? 'text-purple-600' : 'text-gray-600'}>{user.plan}</strong>
+                  Plan: <strong className={user.plan === 'PRO' || user.plan === 'PRO_PLUS' ? 'text-purple-600' : 'text-gray-600'}>{user.plan}</strong>
                 </span>
-                {user.plan !== 'PRO' && (
+                {user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && !user.isAdmin && (
                   <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
                     Credits: <strong>{user.credits}</strong>
+                  </span>
+                )}
+                {(user.plan === 'PRO' || user.plan === 'PRO_PLUS' || user.isAdmin) && (
+                  <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full">
+                    ∞ Unlimited
                   </span>
                 )}
               </div>
@@ -951,10 +967,78 @@ export default function EditorPage() {
                     )}
                   </div>
                   
+                  {/* Generation Limit Progress Bar */}
+                  {user.plan === 'FREE' && (
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">Generation Progress</span>
+                        <span className="text-sm text-gray-500">
+                          {user.planGenerations || 0}/{user.maxGenerations} used
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            (user.planGenerations || 0) >= user.maxGenerations 
+                              ? 'bg-red-500' 
+                              : (user.planGenerations || 0) >= user.maxGenerations * 0.8 
+                                ? 'bg-yellow-500' 
+                                : 'bg-blue-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(((user.planGenerations || 0) / user.maxGenerations) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                      {(user.planGenerations || 0) >= user.maxGenerations && (
+                        <p className="text-red-600 text-sm mt-2 font-medium">
+                          ⚠️ Generation limit reached. Upgrade to continue.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Credits Progress Bar */}
+                  {user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && (
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">Credits Remaining</span>
+                        <span className="text-sm text-gray-500">{user.credits} credits</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            user.credits <= 0 
+                              ? 'bg-red-500' 
+                              : user.credits <= 10 
+                                ? 'bg-yellow-500' 
+                                : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min((user.credits / 50) * 100, 100)}%` }}
+                        />
+                      </div>
+                      {user.credits <= 0 && (
+                        <p className="text-red-600 text-sm mt-2 font-medium">
+                          ⚠️ No credits remaining. Buy more or upgrade to continue.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
                   <motion.button
                     onClick={handleGenerate}
-                    disabled={isGenerating || (user.plan !== 'PRO' && user.credits <= 0)}
-                    className="btn-primary w-full"
+                    disabled={
+                      isGenerating || 
+                      (user.plan === 'FREE' && user.planGenerations >= user.maxGenerations) ||
+                      (user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && user.credits <= 0)
+                    }
+                    className={`w-full transition-all ${
+                      isGenerating || 
+                      (user.plan === 'FREE' && user.planGenerations >= user.maxGenerations) ||
+                      (user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && user.credits <= 0)
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                        : 'btn-primary'
+                    }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -963,8 +1047,12 @@ export default function EditorPage() {
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Generating...
                       </div>
+                    ) : (user.plan === 'FREE' && user.planGenerations >= user.maxGenerations) ? (
+                      'Limit Reached - Upgrade to Continue'
+                    ) : (user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && user.credits <= 0) ? (
+                      'No Credits - Buy More or Upgrade'
                     ) : (
-                      <>Generate Plan {user.plan !== 'PRO' && `(${user.credits} credits)`}</>
+                      <>Generate Plan {user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && `(${user.credits} credits)`}</>
                     )}
                   </motion.button>
 
