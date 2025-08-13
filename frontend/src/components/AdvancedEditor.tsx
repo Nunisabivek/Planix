@@ -381,37 +381,10 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
       layer: 'dimensions',
     });
 
-    // Extension lines
-    const angle = Math.atan2(to.y - from.y, to.x - from.x);
-    const perpAngle = angle + Math.PI / 2;
-    const extLength = 10;
-
-    const ext1 = new fabric.Line([
-      from.x - Math.cos(perpAngle) * extLength,
-      from.y - Math.sin(perpAngle) * extLength,
-      from.x + Math.cos(perpAngle) * extLength,
-      from.y + Math.sin(perpAngle) * extLength
-    ], {
-      stroke: '#8b5cf6',
-      strokeWidth: 1,
-      selectable: true,
-      layer: 'dimensions',
-    });
-
-    const ext2 = new fabric.Line([
-      to.x - Math.cos(perpAngle) * extLength,
-      to.y - Math.sin(perpAngle) * extLength,
-      to.x + Math.cos(perpAngle) * extLength,
-      to.y + Math.sin(perpAngle) * extLength
-    ], {
-      stroke: '#8b5cf6',
-      strokeWidth: 1,
-      selectable: true,
-      layer: 'dimensions',
-    });
-
-    fabricCanvas.current.add(line, text, ext1, ext2);
+    fabricCanvas.current.add(line, text);
   }, []);
+
+
 
   const loadFloorPlan = useCallback((plan: any) => {
     if (!fabricCanvas.current) return;
