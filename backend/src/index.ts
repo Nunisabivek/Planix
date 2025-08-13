@@ -852,8 +852,49 @@ DESIGN PHILOSOPHY:
   let floorPlan: any | null = null;
   let aiProvider = 'fallback';
 
-  // Try DeepSeek first (better engineering knowledge) - available for all users since credits are pre-paid
-  if (deepseekKey) {
+  // === GEMINI FIRST: CAD-STYLE JSON OUTPUT ===
+  if (!floorPlan && genAI) {
+    try {
+      console.log('🤖 Attempting Gemini floor plan generation...');
+      const modelPrimary = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      const modelFallback = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const cadPrompt = `You are a senior architect and CAD expert. Generate a precise 2D single-floor plan as STRICT JSON only (no markdown). Use meters and align coordinates to a 0.1 m grid. Ensure all rooms, walls, doors, and windows are dimensioned. Keep origin near 0,0 and lay out rooms in a rectangular footprint with non-overlapping geometry.
+
+SCHEMA:
+{
+  "metadata": { "totalArea": number, "builtUpArea": number, "plotSize": {"width": number, "height": number}, "floors": number, "style": string },
+  "rooms": [ {"id": string, "type": "living_room|kitchen|bedroom|master_bedroom|bathroom|dining|study|balcony|garage|utility|entrance|staircase", "dimensions": {"x": number, "y": number, "width": number, "height": number}, "label": string, "area": number} ],
+  "walls": [ {"id": string, "from": {"x": number, "y": number}, "to": {"x": number, "y": number}, "type": "load_bearing|partition", "thickness": number } ],
+  "doors": [ {"id": string, "position": {"x": number, "y": number}, "width": number, "height": number, "type": "main|room|bathroom|sliding" } ],
+  "windows": [ {"id": string, "position": {"x": number, "y": number}, "width": number, "height": number, "type": "casement|sliding|fixed" } ]
+}
+
+CONSTRAINTS:
+- Units = meters; snap all values to 0.1 precision.
+- Place doors/windows on walls with realistic sizes (door ~0.9x2.1, window ~1.2x1.2 typical).
+- Living, kitchen, bedrooms at reasonable sizes for ${requirements?.bedrooms || '2-3'} BHK if not specified.
+- Return JSON only.`;
+
+      const generationConfig: any = { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: 'application/json' };
+      let result = await modelPrimary.generateContent({ contents: [{ role: 'user', parts: [{ text: `${cadPrompt}\n\nUser requirements: ${enhancedPrompt}` }] }], generationConfig });
+      let text = result.response?.text() || '';
+      if (!text || text.trim() === '') {
+        // fallback to flash
+        result = await modelFallback.generateContent({ contents: [{ role: 'user', parts: [{ text: `${cadPrompt}\n\nUser requirements: ${enhancedPrompt}` }] }], generationConfig });
+        text = result.response?.text() || '';
+      }
+      const cleaned = text.replace(/^```json\n?|```$/g, '').trim();
+      floorPlan = JSON.parse(cleaned);
+      aiProvider = 'gemini';
+      console.log('✅ Gemini generated floor plan');
+    } catch (err) {
+      console.error('❌ Gemini generation failed, will try DeepSeek:', err);
+    }
+  }
+
+  // Try DeepSeek (fallback) – engineering knowledge
+  if (!floorPlan && deepseekKey) {
     console.log(`🤖 Attempting DeepSeek AI generation for ${user.plan} user...`);
     try {
       const { data } = await axios.post('https://api.deepseek.com/chat/completions', {
