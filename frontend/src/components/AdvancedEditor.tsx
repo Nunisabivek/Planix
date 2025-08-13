@@ -296,7 +296,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
     setIsDrawing(false);
     startPoint.current = null;
     tempObject.current = null;
-  }, [activeTool, addDimension, snap]);
+  }, [activeTool, snap]);
 
   const startDrawingWall = useCallback((pointer: any) => {}, []);
 
