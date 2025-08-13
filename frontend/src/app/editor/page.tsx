@@ -486,10 +486,10 @@ export default function EditorPage() {
       if (res.ok) {
         const project = await res.json();
         setCurrentProject(project);
-        setFloorPlan(project.floorPlanData);
-        setAnalysisResults(project.analysisData);
+        setFloorPlan(project.floorPlanData || null);
+        setAnalysisResults(project.analysisData || null);
         
-        if (!useAdvancedEditor && project.floorPlanData) {
+        if (!useAdvancedEditor && project.floorPlanData && project.floorPlanData.rooms && project.floorPlanData.rooms.length > 0) {
           renderFloorPlan(project.floorPlanData);
         }
       }

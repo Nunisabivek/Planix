@@ -41,7 +41,7 @@ interface Window {
 }
 
 interface FloorPlanData {
-  rooms: Room[];
+  rooms?: Room[];
   walls?: Wall[];
   doors?: Door[];
   windows?: Window[];
@@ -80,7 +80,7 @@ export default function FloorPlanRenderer({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !floorPlan) return;
+    if (!canvas || !floorPlan || !floorPlan.rooms || floorPlan.rooms.length === 0) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -118,8 +118,8 @@ export default function FloorPlanRenderer({
 
   const calculateBounds = (plan: FloorPlanData) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-    plan.rooms.forEach(room => {
+    const rooms = plan?.rooms ?? [];
+    rooms.forEach(room => {
       const { x, y, width, height } = room.dimensions;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
@@ -147,16 +147,16 @@ export default function FloorPlanRenderer({
     }
 
     // Draw walls first (if available)
-    if (plan.walls && plan.walls.length > 0) {
+    if (plan?.walls && plan.walls.length > 0) {
       drawWalls(ctx, plan.walls, scale, offset);
     }
 
     // Draw rooms
-    drawRooms(ctx, plan.rooms, scale, offset);
+    drawRooms(ctx, plan?.rooms ?? [], scale, offset);
 
     // Draw doors and windows
-    if (plan.doors) drawDoors(ctx, plan.doors, scale, offset);
-    if (plan.windows) drawWindows(ctx, plan.windows, scale, offset);
+    if (plan?.doors) drawDoors(ctx, plan.doors, scale, offset);
+    if (plan?.windows) drawWindows(ctx, plan.windows, scale, offset);
 
     // Draw dimensions if enabled
     if (internalShowDimensions) {
