@@ -125,10 +125,11 @@ const razorpay = new Razorpay({
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://*.vercel.app',
+    'https://planix-seven.vercel.app', // Your actual Vercel domain
     'https://planix.vercel.app',
-    'https://your-frontend-domain.vercel.app'
-  ],
+    /^https:\/\/.*\.vercel\.app$/, // Regex pattern for any Vercel subdomain
+    process.env.FRONTEND_URL // Allow environment variable override
+  ].filter(Boolean), // Remove undefined values
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
