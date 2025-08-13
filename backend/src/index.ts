@@ -746,8 +746,15 @@ app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: num
     }
   }
 
+  console.log(`🚀 Generation request from ${isAdmin ? 'ADMIN' : user.plan} user: ${user.email}`);
+  console.log(`📝 Prompt: "${prompt.substring(0, 100)}..."`);
+  
   const geminiKey = process.env.GEMINI_API_KEY;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  
+  console.log(`🔑 API Keys status: Gemini=${!!geminiKey}, DeepSeek=${!!deepseekKey}, OpenAI=${!!openaiKey}`);
+  
   const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 
   // Enhanced system prompt with requirements and plan limits
@@ -864,8 +871,9 @@ DESIGN PHILOSOPHY:
   if (!floorPlan && genAI) {
     try {
       console.log('🤖 Attempting Gemini floor plan generation...');
-      const modelPrimary = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-      const modelFallback = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('🔑 Using Gemini API key (length:', geminiKey?.length || 0, 'chars)');
+      const modelPrimary = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+      const modelFallback = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
       const cadPrompt = `You are a senior architect and CAD expert. Generate a precise 2D single-floor plan as STRICT JSON only (no markdown). Use meters and align coordinates to a 0.1 m grid. Ensure all rooms, walls, doors, and windows are dimensioned. Keep origin near 0,0 and lay out rooms in a rectangular footprint with non-overlapping geometry.
 
