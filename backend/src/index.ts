@@ -715,7 +715,7 @@ app.post('/api/generate-plan', requireAuth, async (req: Request & { userId?: num
   if (!user) return res.status(404).json({ error: 'User not found' });
   
   // Special access for testing - replace with your actual email
-  const ADMIN_EMAILS = ['nunisabivek@gmail.com']; // Add your email here
+  const ADMIN_EMAILS = ['nunisaalex456@gmail.com']; // Add your email here
   const isAdmin = ADMIN_EMAILS.includes(user.email);
   
   // Check plan limits and credits (skip for admin)
@@ -1429,7 +1429,7 @@ app.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: 
   if (!user) return res.status(404).json({ error: 'User not found' });
   
   // Check if admin user
-  const ADMIN_EMAILS = ['nunisabivek@gmail.com']; // Add your email here
+  const ADMIN_EMAILS = ['nunisaalex456@gmail.com']; // Add your email here
   const isAdmin = ADMIN_EMAILS.includes(user.email);
   
   res.json({ 
