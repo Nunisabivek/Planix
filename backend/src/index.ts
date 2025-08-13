@@ -123,13 +123,30 @@ const razorpay = new Razorpay({
 });
 
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://planix-seven.vercel.app', // Your actual Vercel domain
-    'https://planix.vercel.app',
-    /^https:\/\/.*\.vercel\.app$/, // Regex pattern for any Vercel subdomain
-    process.env.FRONTEND_URL // Allow environment variable override
-  ].filter(Boolean), // Remove undefined values
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://planix-seven.vercel.app', // Your actual Vercel domain
+      'https://planix.vercel.app',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Check if origin matches Vercel pattern
+    if (origin.match(/^https:\/\/.*\.vercel\.app$/)) {
+      return callback(null, true);
+    }
+    
+    // Reject other origins
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
