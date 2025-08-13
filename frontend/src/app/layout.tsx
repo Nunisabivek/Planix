@@ -21,21 +21,7 @@ export default function RootLayout({
       <head>
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="beforeInteractive" />
       </head>
-      <body className={inter.className}>
-        {children}
-        <footer className="border-t mt-12 py-8 text-sm text-gray-600">
-          <div className="max-w-7xl mx-auto px-6 flex flex-wrap gap-4 justify-between">
-            <div>© {new Date().getFullYear()} Planix</div>
-            <div className="flex gap-4">
-              <a href="/privacy">Privacy</a>
-              <a href="/terms">Terms</a>
-              <a href="/cancellation-and-refunds">Cancellation & Refunds</a>
-              <a href="/shipping">Shipping</a>
-              <a href="/contact">Contact</a>
-            </div>
-          </div>
-        </footer>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

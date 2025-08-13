@@ -532,6 +532,14 @@ export default function HomePage() {
             <Link href="/signup" className="hover:text-white transition-colors">Sign Up</Link>
             <Link href="/subscribe" className="hover:text-white transition-colors">Pricing</Link>
           </div>
+          <div className="mt-6 flex justify-center gap-6 text-xs text-gray-500">
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link href="/cancellation-and-refunds" className="hover:text-white transition-colors">Cancellation & Refunds</Link>
+            <Link href="/shipping" className="hover:text-white transition-colors">Shipping</Link>
+            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+          </div>
+          <p className="mt-4 text-xs text-gray-600">© {new Date().getFullYear()} Planix</p>
         </div>
       </footer>
     </div>
