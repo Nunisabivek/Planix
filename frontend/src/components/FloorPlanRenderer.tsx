@@ -168,19 +168,26 @@ export default function FloorPlanRenderer({
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, scale: number, offset: { x: number; y: number }) => {
-    ctx.strokeStyle = '#f0f0f0';
-    ctx.lineWidth = 0.5;
+    // CAD-like grid: maintain ~40px between lines visually, quantized to 0.5m world units
+    ctx.strokeStyle = '#e9eef5';
+    ctx.lineWidth = 1;
 
-    const gridSize = 1 * scale; // 1 meter grid
-    
-    for (let x = offset.x % gridSize; x < width; x += gridSize) {
+    const targetPixels = 40; // visual spacing target
+    const worldStepRaw = targetPixels / scale; // world meters for ~40px
+    const worldStep = Math.max(0.5, Math.round(worldStepRaw * 2) / 2); // snap to 0.5m
+    const stepPx = worldStep * scale;
+
+    const startX = offset.x % stepPx;
+    const startY = offset.y % stepPx;
+
+    for (let x = startX; x < width; x += stepPx) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
     }
 
-    for (let y = offset.y % gridSize; y < height; y += gridSize) {
+    for (let y = startY; y < height; y += stepPx) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
