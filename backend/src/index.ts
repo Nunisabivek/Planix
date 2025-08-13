@@ -128,6 +128,7 @@ app.use(cors({
       'http://localhost:3000',
       'https://planix-seven.vercel.app', // Your actual Vercel domain
       'https://planix.vercel.app',
+      'https://planix.live',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -139,8 +140,8 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Check if origin matches Vercel pattern
-    if (origin.match(/^https:\/\/.*\.vercel\.app$/)) {
+    // Check if origin matches Vercel or custom domain pattern
+    if (origin.match(/^https:\/\/.*\.vercel\.app$/) || origin.match(/^https:\/\/.*\.planix\.live$/)) {
       return callback(null, true);
     }
     
