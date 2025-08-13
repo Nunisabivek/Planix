@@ -87,10 +87,20 @@ export default function SignupClient() {
       } else if (errorMessage.includes('Invalid referral')) {
         setError('The referral code you entered is invalid. Please check and try again.');
       } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
-        setError('Network error. Please check your connection and try again.');
+        setError('❌ Unable to connect to server. The backend API might be down. Please try again later.');
+      } else if (errorMessage.includes('405')) {
+        setError('🚫 API endpoint not found. The backend service might not be running properly.');
+      } else if (errorMessage.includes('CORS')) {
+        setError('🌐 Cross-origin request blocked. Please contact support.');
       } else {
-        setError(errorMessage || 'Signup failed. Please try again.');
+        setError(`❌ Registration failed: ${errorMessage}. Please try again.`);
       }
+      
+      // Log additional debug info
+      console.log('🔍 Error details:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
     } finally {
       setIsLoading(false);
     }

@@ -4,6 +4,11 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||
     ? 'http://localhost:8080' 
     : 'https://planix-production-5228.up.railway.app');
 
+// Debug API URL
+console.log('🔗 API_BASE_URL:', API_BASE_URL);
+console.log('🌍 Environment:', process.env.NODE_ENV);
+console.log('🔑 NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+
 export const apiEndpoints = {
   // Auth endpoints
   register: `${API_BASE_URL}/api/auth/register`,
@@ -38,6 +43,9 @@ export const apiEndpoints = {
 // Helper function for making API requests with proper error handling
 export async function apiRequest(url: string, options: RequestInit = {}) {
   try {
+    console.log('🌐 Making API request to:', url);
+    console.log('📋 Request options:', JSON.stringify(options, null, 2));
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -46,14 +54,20 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
       },
     });
 
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('❌ API Error Response:', errorData);
       throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('✅ API Success Response:', data);
+    return data;
   } catch (error) {
-    console.error('API Request Error:', error);
+    console.error('💥 API Request Error:', error);
     throw error;
   }
 }
