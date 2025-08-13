@@ -202,10 +202,18 @@ app.get('/api/health', async (req: Request, res: Response) => {
 
 // Register a new user
 app.post('/api/auth/register', async (req: Request, res: Response) => {
+  console.log('🎯 Registration attempt:', { 
+    body: req.body, 
+    hasEmail: !!req.body?.email,
+    hasPassword: !!req.body?.password,
+    hasName: !!req.body?.name 
+  });
+  
   const { email, password, name, referralCode } = req.body as { email: string; password: string; name: string; referralCode?: string };
 
   // Validation
   if (!email || !password || !name) {
+    console.error('❌ Validation failed:', { email: !!email, password: !!password, name: !!name });
     return res.status(400).json({ error: 'Email, password, and name are required' });
   }
 
@@ -214,12 +222,15 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
   }
 
   try {
+    console.log('🔍 Checking if user already exists...');
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+      console.log('❌ User already exists');
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
+    console.log('🔒 Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // If the user supplied a referral code, check if it exists
@@ -247,9 +258,11 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     }
 
     // Generate email verification token
+    console.log('🎫 Generating email verification token...');
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
+    console.log('👤 Creating user in database...');
     const user = await prisma.user.create({
       data: {
         email,
@@ -272,12 +285,18 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     }
 
     // Send verification email
+    console.log('📧 Setting up email transporter...');
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
+    });
+    
+    console.log('📧 Email config:', { 
+      hasEmailUser: !!process.env.EMAIL_USER,
+      hasEmailPassword: !!process.env.EMAIL_PASSWORD 
     });
 
     const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${emailVerificationToken}`;
@@ -324,8 +343,11 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       `,
     };
 
+    console.log('📤 Sending verification email...');
     await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent successfully!');
 
+    console.log('🎉 Registration successful!');
     res.status(201).json({ 
       message: 'Registration successful! Please check your email to verify your account before logging in.',
       userId: user.id,
@@ -334,6 +356,11 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      name: error instanceof Error ? error.name : 'Unknown'
+    });
     res.status(500).json({ error: 'Internal server error. Please try again.' });
   }
 });
