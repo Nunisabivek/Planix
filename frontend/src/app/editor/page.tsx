@@ -36,11 +36,25 @@ export default function EditorPage() {
     location: ''
   });
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [useAdvancedEditor, setUseAdvancedEditor] = useState(true);
+  // Advanced editor preference (default off, persisted)
+  const [useAdvancedEditor, setUseAdvancedEditor] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pref = localStorage.getItem('useAdvancedEditor');
+      if (pref !== null) setUseAdvancedEditor(pref === 'true');
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('useAdvancedEditor', String(useAdvancedEditor));
+    }
+  }, [useAdvancedEditor]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [currentView, setCurrentView] = useState<'editor' | 'usage' | 'billing' | 'settings'>('editor');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [aiProvider, setAiProvider] = useState<string>('ai');
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
@@ -377,38 +391,35 @@ export default function EditorPage() {
   };
 
   // Project Management Functions
-  const createNewProject = async () => {
+  const createNewProject = () => {
+    setNewProjectName('');
+    setShowProjectModal(true);
+  };
+
+  const confirmCreateProject = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
-
-    const name = window.prompt('Enter project name:');
-    if (!name || name.trim() === '') return;
-
+    const name = newProjectName.trim();
+    if (!name) return;
     try {
       const api = API_BASE_URL;
       const res = await fetch(`${api}/api/projects`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name,
-          description: '',
-          floorPlanData: {}
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, description: '', floorPlanData: {} }),
       });
-
       if (res.ok) {
         const project = await res.json();
         setCurrentProject(project);
         setFloorPlan(null);
         setAnalysisResults(null);
-        alert('✅ New project created successfully!');
+        setShowProjectModal(false);
         loadProjects();
+      } else {
+        alert('Failed to create project');
       }
-    } catch (error) {
-      console.error('Create project error:', error);
+    } catch (e) {
+      console.error('Create project error:', e);
       alert('Failed to create project');
     }
   };
@@ -820,9 +831,11 @@ export default function EditorPage() {
                         onClick={() => loadProject(project.id)}
                       >
                         <p className="text-sm font-medium">{project.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(project.updatedAt).toLocaleDateString()}
-                        </p>
+                        {project.updatedAt && (
+                          <p className="text-xs text-gray-500">
+                            {new Date(project.updatedAt).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -840,8 +853,8 @@ export default function EditorPage() {
                     <textarea
                       value={userPrompt}
                       onChange={(e) => setUserPrompt(e.target.value)}
-                      className="input w-full resize-none"
-                      rows={3}
+                      className="input w-full resize-none min-h-[140px]"
+                      rows={6}
                       placeholder="e.g., A modern 3-bedroom house with open kitchen, large living room, and 2 bathrooms"
                     />
                   </div>
@@ -1270,6 +1283,26 @@ export default function EditorPage() {
         projectName={currentProject?.name || 'floor-plan'}
         isPro={user?.plan === 'PRO'}
       />
+
+      {/* Create Project Modal */}
+      {showProjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold mb-4">Create New Project</h3>
+            <input
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              className="input w-full mb-4"
+              placeholder="Enter project name"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowProjectModal(false)} className="btn-outline text-sm">Cancel</button>
+              <button onClick={confirmCreateProject} className="btn-primary text-sm">Create</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
