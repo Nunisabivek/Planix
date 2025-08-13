@@ -138,6 +138,10 @@ export default function EditorPage() {
         }
       };
       
+      console.log('🌐 Making request to:', `${api}/api/generate-plan`);
+      console.log('📋 Request data:', reqData);
+      console.log('🔑 Token present:', !!token);
+      
       const res = await fetch(`${api}/api/generate-plan`, {
         method: 'POST',
         headers: {
@@ -146,6 +150,9 @@ export default function EditorPage() {
         },
         body: JSON.stringify(reqData),
       });
+      
+      console.log('📡 Response status:', res.status);
+      console.log('📡 Response ok:', res.ok);
 
       const resp = await res.json();
       
