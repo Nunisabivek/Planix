@@ -29,7 +29,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const api = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin.replace('vercel.app','up.railway.app').replace('https://planix-seven.','https://planix-production-5228.') : '');
       const response = await fetch(`${api}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +68,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     try {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const api = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin.replace('vercel.app','up.railway.app').replace('https://planix-seven.','https://planix-production-5228.') : '');
       const response = await fetch(`${api}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
