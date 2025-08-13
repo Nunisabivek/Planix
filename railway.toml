@@ -3,7 +3,7 @@ name = "backend"
 source = "backend"
 
 [services.backend.build]
-buildCommand = "npm ci --omit=dev && npm run build && npx prisma generate"
+buildCommand = "npm ci --omit=dev && npm run build && npx prisma generate && npx prisma db push --accept-data-loss"
 
 [services.backend.deploy]
-startCommand = "npx prisma db push --accept-data-loss && npm start"
+startCommand = "npm start"
