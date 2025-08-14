@@ -689,12 +689,12 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
       <div className="flex-1 flex flex-col">
         {/* Top Toolbar */}
         <motion.div
-          className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4"
+          className="min-h-14 bg-white border-b border-gray-200 flex flex-wrap items-center gap-2 px-4 overflow-x-auto"
           initial={{ y: -56 }}
           animate={{ y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 shrink-0">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleZoom('out')}
@@ -744,7 +744,8 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
             </div>
           </div>
 
-                      <div className="flex items-center gap-2">
+          {/* Right actions pinned to the end; always visible */}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
               <button
                 onClick={() => handleZoom('fit')}
                 className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
@@ -794,7 +795,7 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
               >
                 📤 Export
               </button>
-            </div>
+          </div>
         </motion.div>
 
         {/* Canvas Container */}
