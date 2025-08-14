@@ -1062,6 +1062,76 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
     };
   }
 
+  // === Normalize and validate geometry; compute bounds ===
+  const snap = (v: number) => Math.round(v * 10) / 10; // 0.1 m grid
+  const normalizePlan = (plan: any) => {
+    const rooms = (plan.rooms || []).map((r: any, i: number) => ({
+      id: r.id || `room_${i}`,
+      type: r.type || 'room',
+      label: r.label || r.type || `Room ${i + 1}`,
+      dimensions: {
+        x: snap(r.dimensions?.x ?? 0),
+        y: snap(r.dimensions?.y ?? 0),
+        width: Math.max(0.8, snap(r.dimensions?.width ?? 3)),
+        height: Math.max(0.8, snap(r.dimensions?.height ?? 3))
+      },
+      area: snap((r.dimensions?.width ?? 3) * (r.dimensions?.height ?? 3))
+    }));
+
+    const walls = (plan.walls || []).map((w: any, i: number) => ({
+      id: w.id || `wall_${i}`,
+      from: { x: snap(w.from?.x ?? 0), y: snap(w.from?.y ?? 0) },
+      to: { x: snap(w.to?.x ?? 0), y: snap(w.to?.y ?? 0) },
+      type: w.type || 'partition',
+      thickness: snap(w.thickness ?? 0.2)
+    }));
+
+    const doors = (plan.doors || []).map((d: any, i: number) => ({
+      id: d.id || `door_${i}`,
+      position: { x: snap(d.position?.x ?? 0), y: snap(d.position?.y ?? 0) },
+      width: snap(d.width ?? 0.9),
+      height: snap(d.height ?? 2.1),
+      type: d.type || 'room'
+    }));
+
+    const windows = (plan.windows || []).map((w: any, i: number) => ({
+      id: w.id || `window_${i}`,
+      position: { x: snap(w.position?.x ?? 0), y: snap(w.position?.y ?? 0) },
+      width: snap(w.width ?? 1.2),
+      height: snap(w.height ?? 1.2),
+      type: w.type || 'sliding'
+    }));
+
+    // Compute bounds from rooms (fallback to walls)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    rooms.forEach((r: any) => {
+      minX = Math.min(minX, r.dimensions.x);
+      minY = Math.min(minY, r.dimensions.y);
+      maxX = Math.max(maxX, r.dimensions.x + r.dimensions.width);
+      maxY = Math.max(maxY, r.dimensions.y + r.dimensions.height);
+    });
+    if (rooms.length === 0 && walls.length > 0) {
+      walls.forEach((w: any) => {
+        minX = Math.min(minX, w.from.x, w.to.x);
+        minY = Math.min(minY, w.from.y, w.to.y);
+        maxX = Math.max(maxX, w.from.x, w.to.x);
+        maxY = Math.max(maxY, w.from.y, w.to.y);
+      });
+    }
+    if (minX === Infinity) { minX = 0; minY = 0; maxX = 10; maxY = 10; }
+
+    return {
+      ...plan,
+      rooms,
+      walls,
+      doors,
+      windows,
+      bounds: { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
+    };
+  };
+
+  floorPlan = normalizePlan(floorPlan);
+
   // Update user stats and credits based on plan (skip for admin)
   if (!isAdmin) {
     // Estimate complexity cost (5–15 credits) based on room/wall count

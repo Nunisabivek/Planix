@@ -90,7 +90,7 @@ export default function FloorPlanRenderer({
     canvas.height = height;
 
     // Calculate scale and offset to fit the floor plan
-    const bounds = calculateBounds(floorPlan);
+    const bounds = (floorPlan as any).bounds || calculateBounds(floorPlan);
     const scaleX = (width - 100) / bounds.width;
     const scaleY = (height - 100) / bounds.height;
     // Cap auto scale to avoid gigantic text/rendering when plans are very small
