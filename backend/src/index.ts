@@ -1590,6 +1590,8 @@ app.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: 
   // Check if admin user
   const ADMIN_EMAILS = ['nunisaalex456@gmail.com']; // Add your email here
   const isAdmin = ADMIN_EMAILS.includes(user.email);
+  // Count projects for progress UI
+  const projectsCount = await prisma.project.count({ where: { userId: user.id } });
   
   res.json({ 
     id: user.id, 
@@ -1598,6 +1600,8 @@ app.get('/api/me', requireAuth, async (req: Request & { userId?: number }, res: 
     credits: isAdmin ? 9999 : user.credits, 
     planGenerations: isAdmin ? 0 : user.planGenerations,
     maxGenerations: isAdmin ? 9999 : user.maxGenerations,
+    maxProjects: isAdmin ? 9999 : user.maxProjects,
+    projectsCount,
     referralCode: user.referralCode, 
     referralDiscountEligible: user.referralDiscountEligible, 
     referralDiscountUsed: user.referralDiscountUsed,

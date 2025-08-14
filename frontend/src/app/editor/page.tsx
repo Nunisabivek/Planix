@@ -150,7 +150,11 @@ export default function EditorPage() {
           id: u.id,
           credits: u.credits,
           plan: u.plan,
-          referralCode: u.referralCode
+          referralCode: u.referralCode,
+          planGenerations: u.planGenerations,
+          maxGenerations: u.maxGenerations,
+          maxProjects: u.maxProjects,
+          projectsCount: u.projectsCount
         };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -1057,6 +1061,35 @@ export default function EditorPage() {
                     )}
                   </div>
                   
+                  {/* Project Limit Progress Bar */}
+                  {user.plan === 'FREE' && (
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">Projects Used</span>
+                        <span className="text-sm text-gray-500">{user.projectsCount || 0}/{user.maxProjects}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            (user.projectsCount || 0) >= user.maxProjects
+                              ? 'bg-red-500'
+                              : (user.projectsCount || 0) >= user.maxProjects * 0.8
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                          }`}
+                          style={{
+                            width: `${Math.min(((user.projectsCount || 0) / user.maxProjects) * 100, 100)}%`
+                          }}
+                        />
+                      </div>
+                      {(user.projectsCount || 0) >= user.maxProjects && (
+                        <p className="text-red-600 text-sm mt-2 font-medium">
+                          ⚠️ Project limit reached. Upgrade to create more projects.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Generation Limit Progress Bar */}
                   {user.plan === 'FREE' && (
                     <div className="mb-4">
