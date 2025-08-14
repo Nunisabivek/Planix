@@ -1090,36 +1090,7 @@ export default function EditorPage() {
                     </div>
                   )}
 
-                  {/* Generation Limit Progress Bar */}
-                  {user.plan === 'FREE' && (
-                    <div className="mb-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Generation Progress</span>
-                        <span className="text-sm text-gray-500">
-                          {user.planGenerations || 0}/{user.maxGenerations} used
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            (user.planGenerations || 0) >= user.maxGenerations 
-                              ? 'bg-red-500' 
-                              : (user.planGenerations || 0) >= user.maxGenerations * 0.8 
-                                ? 'bg-yellow-500' 
-                                : 'bg-blue-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(((user.planGenerations || 0) / user.maxGenerations) * 100, 100)}%` 
-                          }}
-                        />
-                      </div>
-                      {(user.planGenerations || 0) >= user.maxGenerations && (
-                        <p className="text-red-600 text-sm mt-2 font-medium">
-                          ⚠️ Generation limit reached. Upgrade to continue.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {/* Generation Progress hidden per request */}
 
                   {/* Credits Progress Bar */}
                   {user.plan !== 'PRO' && user.plan !== 'PRO_PLUS' && (
