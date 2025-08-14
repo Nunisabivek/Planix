@@ -1588,16 +1588,33 @@ app.post('/api/payment/verify', requireAuth, async (req: Request & { userId?: nu
         ? new Date(notes.subscriptionExpiry)
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days
 
-      await prisma.user.update({
+      const updated = await prisma.user.update({
         where: { id: req.userId! },
         data: {
-          plan: 'PRO',
+          // Set plan based on notes.plan (defaults to PRO)
+          plan: (notes.plan === 'PRO_PLUS' ? 'PRO_PLUS' : 'PRO'),
           subscriptionId: order_id,
           subscriptionExpiry,
           referralDiscountUsed: notes.discountApplied ? true : undefined,
           credits: 9999,
         },
       });
+
+      // If referral discount applied and referrer exists, award 50 credits to referrer
+      if (notes.discountApplied && notes.referralCode) {
+        const referrer = await prisma.user.findUnique({ where: { referralCode: notes.referralCode as string } });
+        if (referrer) {
+          await prisma.user.update({ where: { id: referrer.id }, data: { credits: { increment: 50 } } });
+          await prisma.usageHistory.create({
+            data: {
+              userId: referrer.id,
+              action: 'referral_bonus',
+              creditsUsed: -50,
+              details: { referredUserId: req.userId!, orderId: order_id }
+            }
+          });
+        }
+      }
 
       // Record subscription in usage history
       await prisma.usageHistory.create({
@@ -1618,7 +1635,7 @@ app.post('/api/payment/verify', requireAuth, async (req: Request & { userId?: nu
 
       res.json({ 
         message: 'Payment verified successfully', 
-        plan: 'PRO',
+        plan: (notes.plan === 'PRO_PLUS' ? 'PRO_PLUS' : 'PRO'),
         subscriptionExpiry: subscriptionExpiry.toISOString(),
         discountApplied: notes.discountApplied || false
       });

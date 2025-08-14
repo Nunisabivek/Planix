@@ -16,6 +16,7 @@ export default function SubscribePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedTier, setSelectedTier] = useState<'PRO' | 'PRO_PLUS'>('PRO');
   const [showReferralInput, setShowReferralInput] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const router = useRouter();
@@ -33,6 +34,16 @@ export default function SubscribePage() {
       setUser(JSON.parse(userData));
     }
   }, [router]);
+
+  // Pricing map (INR)
+  const pricing = {
+    PRO: { monthly: 1699, yearly: 9990 },
+    PRO_PLUS: { monthly: 3500, yearly: 24990 }
+  } as const;
+
+  const hasDiscount = !!referralCode || (!!user?.referralDiscountEligible && !user?.referralDiscountUsed);
+  const baseAmount = pricing[selectedTier][selectedPlan];
+  const finalAmount = hasDiscount ? Math.floor(baseAmount * 0.5) : baseAmount;
 
   const handleSubscribe = async () => {
     const token = localStorage.getItem('token');
@@ -53,11 +64,11 @@ export default function SubscribePage() {
           Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        amount: selectedPlan === 'yearly' ? 9990 : 999,
+        amount: baseAmount,
         currency: 'INR',
-        receipt: `sub_${selectedPlan}_${Date.now()}`,
+        receipt: `sub_${selectedTier}_${selectedPlan}_${Date.now()}`,
         notes: { 
-          plan: 'PRO', 
+          plan: selectedTier, 
           billing: selectedPlan,
           userId: user?.id,
           referralCode: referralCode || undefined
@@ -76,8 +87,8 @@ export default function SubscribePage() {
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'YOUR_KEY_ID',
       amount: order.amount,
       currency: order.currency,
-      name: 'Planix Pro',
-        description: `${selectedPlan === 'yearly' ? 'Annual' : 'Monthly'} Pro Subscription${referralCode ? ' (50% off with referral)' : ''}`,
+      name: selectedTier === 'PRO_PLUS' ? 'Planix Pro+': 'Planix Pro',
+        description: `${selectedPlan === 'yearly' ? 'Annual' : 'Monthly'} ${selectedTier === 'PRO_PLUS' ? 'Pro+':'Pro'} Subscription${hasDiscount ? ' (50% off with referral)' : ''}`,
       order_id: order.id,
       handler: async function (response: any) {
           try {
@@ -99,12 +110,12 @@ export default function SubscribePage() {
             
             if (verifyRes.ok) {
               // Update local user data
-              const updatedUser = { ...user, plan: 'PRO' };
+              const updatedUser = { ...user, plan: selectedTier };
               localStorage.setItem('user', JSON.stringify(updatedUser));
               setUser(updatedUser);
               
               // Show success and redirect
-              alert('🎉 Welcome to Planix Pro! Your subscription is now active.');
+              alert(`🎉 Welcome to Planix ${selectedTier === 'PRO_PLUS' ? 'Pro+' : 'Pro'}! Your subscription is now active.`);
               router.push('/editor');
             } else {
               throw new Error(verificationData.message || 'Payment verification failed');
@@ -238,14 +249,44 @@ export default function SubscribePage() {
                   </div>
                 </div>
 
+                {/* Plan Tier Selector */}
+                <div className="flex justify-center mt-2">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full p-1 flex">
+                    <button
+                      onClick={() => setSelectedTier('PRO')}
+                      className={`px-6 py-2 rounded-full transition-all duration-300 ${
+                        selectedTier === 'PRO' ? 'bg-white text-blue-600 shadow-lg' : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      Pro
+                    </button>
+                    <button
+                      onClick={() => setSelectedTier('PRO_PLUS')}
+                      className={`px-6 py-2 rounded-full transition-all duration-300 ${
+                        selectedTier === 'PRO_PLUS' ? 'bg-white text-blue-600 shadow-lg' : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      Pro+
+                    </button>
+                  </div>
+                </div>
+
                 {/* Pricing Display */}
                 <div className="text-center">
-                  <div className="text-4xl font-bold text-white mb-2">
-                    ₹{selectedPlan === 'yearly' ? '9,990' : '999'}
-                    <span className="text-lg font-normal text-white/70">
+                  <div className="text-4xl font-bold mb-2">
+                    {hasDiscount && (
+                      <div className="text-xl text-white/70 line-through mb-1">₹{baseAmount.toLocaleString('en-IN')}</div>
+                    )}
+                    <span className="text-white">₹{(hasDiscount ? finalAmount : baseAmount).toLocaleString('en-IN')}</span>
+                    <span className="text-lg font-normal text-white/80">
                       /{selectedPlan === 'yearly' ? 'year' : 'month'}
                     </span>
                   </div>
+                  {hasDiscount && (
+                    <div className="inline-block px-3 py-1 rounded-full bg-green-500/20 text-green-200 text-sm font-medium mb-1">
+                      50% OFF applied
+                    </div>
+                  )}
                   {selectedPlan === 'yearly' && (
                     <div className="text-green-400 text-sm">
                       ₹831/month - Save ₹1,998 annually
@@ -298,7 +339,7 @@ export default function SubscribePage() {
                       Processing...
                     </div>
                   ) : (
-                    `Start Your Pro Journey →`
+                    `Start Your ${selectedTier === 'PRO_PLUS' ? 'Pro+' : 'Pro'} Journey →`
                   )}
                 </motion.button>
               </motion.div>
@@ -443,7 +484,12 @@ export default function SubscribePage() {
               </div>
               <div className="text-center text-white">
                 <h3 className="text-2xl font-bold mb-2">Pro</h3>
-                <div className="text-4xl font-bold mb-6">₹999<span className="text-lg opacity-80">/month</span></div>
+                <div className="text-4xl font-bold mb-1">
+                  <span className="text-white/70 line-through text-xl mr-2">₹{pricing.PRO.monthly}</span>
+                  ₹{Math.floor(pricing.PRO.monthly / 2)}
+                  <span className="text-lg opacity-80">/month</span>
+                </div>
+                <div className="text-green-300 text-sm mb-5">50% off with referral</div>
                 <ul className="text-left space-y-3 mb-8">
                   <li className="flex items-center gap-3">
                     <span className="w-5 h-5 bg-white/20 text-white rounded-full flex items-center justify-center text-sm">✓</span>
@@ -472,12 +518,61 @@ export default function SubscribePage() {
                   </div>
                 ) : (
         <button
-          onClick={handleSubscribe}
+          onClick={() => { setSelectedTier('PRO'); handleSubscribe(); }}
                     disabled={isLoading}
                     className="btn-secondary w-full bg-white text-purple-600 hover:bg-gray-100"
         >
                     {isLoading ? 'Processing...' : 'Upgrade Now'}
         </button>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Pro+ Plan */}
+            <motion.div
+              className="card p-8 border-2 bg-slate-900 text-white relative overflow-hidden"
+              variants={{
+                hidden: { opacity: 0, scale: 0.95 },
+                visible: { opacity: 1, scale: 1 }
+              }}
+            >
+              <div className="absolute top-4 right-4 bg-amber-400 text-slate-900 px-3 py-1 rounded-full text-sm font-semibold">
+                Power Users
+              </div>
+              <div className="text-center">
+                <h3 className="text-2xl font-bold mb-2">Pro+</h3>
+                <div className="text-4xl font-bold mb-1">
+                  <span className="text-white/70 line-through text-xl mr-2">₹{pricing.PRO_PLUS.monthly}</span>
+                  ₹{Math.floor(pricing.PRO_PLUS.monthly / 2)}
+                  <span className="text-lg opacity-80">/month</span>
+                </div>
+                <div className="text-green-300 text-sm mb-5">50% off with referral</div>
+                <ul className="text-left space-y-3 mb-8">
+                  <li className="flex items-center gap-3">
+                    <span className="w-5 h-5 bg-white/20 text-white rounded-full flex items-center justify-center text-sm">✓</span>
+                    Unlimited everything + 3D/Revit export
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <span className="w-5 h-5 bg-white/20 text-white rounded-full flex items-center justify-center text-sm">✓</span>
+                    Advanced analysis & compliance tools
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <span className="w-5 h-5 bg-white/20 text-white rounded-full flex items-center justify-center text-sm">✓</span>
+                    Priority support
+                  </li>
+                </ul>
+                {user?.plan === 'PRO_PLUS' ? (
+                  <div className="w-full bg-white/20 text-white py-3 rounded-lg font-semibold">
+                    ✓ Active Subscription
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setSelectedTier('PRO_PLUS'); handleSubscribe(); }}
+                    disabled={isLoading}
+                    className="btn-secondary w-full bg-white text-slate-900 hover:bg-gray-100"
+                  >
+                    {isLoading ? 'Processing...' : 'Go Pro+'}
+                  </button>
                 )}
               </div>
             </motion.div>
