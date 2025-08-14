@@ -425,6 +425,17 @@ export default function AdvancedEditor({ floorPlan, onSave, onExport, className,
       drawGrid();
     }
 
+    // Fit canvas to bounds if available
+    if (plan.bounds) {
+      const pad = 100;
+      const worldW = (plan.bounds.width || 10) * 50;
+      const worldH = (plan.bounds.height || 10) * 50;
+      const neededW = worldW + pad * 2;
+      const neededH = worldH + pad * 2;
+      canvas.setWidth(Math.max(neededW, 1200));
+      canvas.setHeight(Math.max(neededH, 800));
+    }
+
     // Load rooms
     if (plan.rooms) {
       plan.rooms.forEach((room: any) => {

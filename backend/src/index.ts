@@ -1078,7 +1078,7 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
       area: snap((r.dimensions?.width ?? 3) * (r.dimensions?.height ?? 3))
     }));
 
-    const walls = (plan.walls || []).map((w: any, i: number) => ({
+    let walls = (plan.walls || []).map((w: any, i: number) => ({
       id: w.id || `wall_${i}`,
       from: { x: snap(w.from?.x ?? 0), y: snap(w.from?.y ?? 0) },
       to: { x: snap(w.to?.x ?? 0), y: snap(w.to?.y ?? 0) },
@@ -1086,7 +1086,7 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
       thickness: snap(w.thickness ?? 0.2)
     }));
 
-    const doors = (plan.doors || []).map((d: any, i: number) => ({
+    let doors = (plan.doors || []).map((d: any, i: number) => ({
       id: d.id || `door_${i}`,
       position: { x: snap(d.position?.x ?? 0), y: snap(d.position?.y ?? 0) },
       width: snap(d.width ?? 0.9),
@@ -1094,13 +1094,60 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
       type: d.type || 'room'
     }));
 
-    const windows = (plan.windows || []).map((w: any, i: number) => ({
+    let windows = (plan.windows || []).map((w: any, i: number) => ({
       id: w.id || `window_${i}`,
       position: { x: snap(w.position?.x ?? 0), y: snap(w.position?.y ?? 0) },
       width: snap(w.width ?? 1.2),
       height: snap(w.height ?? 1.2),
       type: w.type || 'sliding'
     }));
+
+    // If walls are missing, create simple rectangle walls around each room
+    if (walls.length === 0 && rooms.length > 0) {
+      const rectWalls: any[] = [];
+      rooms.forEach((r: any, idx: number) => {
+        const x1 = r.dimensions.x, y1 = r.dimensions.y;
+        const x2 = r.dimensions.x + r.dimensions.width;
+        const y2 = r.dimensions.y + r.dimensions.height;
+        rectWalls.push({ id: `w_${idx}_1`, from: { x: x1, y: y1 }, to: { x: x2, y: y1 }, type: 'partition', thickness: 0.2 });
+        rectWalls.push({ id: `w_${idx}_2`, from: { x: x2, y: y1 }, to: { x: x2, y: y2 }, type: 'partition', thickness: 0.2 });
+        rectWalls.push({ id: `w_${idx}_3`, from: { x: x2, y: y2 }, to: { x: x1, y: y2 }, type: 'partition', thickness: 0.2 });
+        rectWalls.push({ id: `w_${idx}_4`, from: { x: x1, y: y2 }, to: { x: x1, y: y1 }, type: 'partition', thickness: 0.2 });
+      });
+      walls = rectWalls.map((w: any, i: number) => ({
+        id: w.id || `wall_auto_${i}`,
+        from: { x: snap(w.from.x), y: snap(w.from.y) },
+        to: { x: snap(w.to.x), y: snap(w.to.y) },
+        type: w.type,
+        thickness: snap(w.thickness)
+      }));
+    }
+
+    // If doors/windows are missing, synthesize basic ones for usability
+    if (doors.length === 0) {
+      rooms.forEach((r: any, i: number) => {
+        doors.push({
+          id: `door_auto_${i}`,
+          position: { x: snap(r.dimensions.x + r.dimensions.width / 2), y: snap(r.dimensions.y) },
+          width: 0.9,
+          height: 2.1,
+          type: 'room'
+        });
+      });
+    }
+    if (windows.length === 0) {
+      rooms.forEach((r: any, i: number) => {
+        if (['living_room', 'bedroom', 'master_bedroom', 'study'].includes(r.type)) {
+          windows.push({
+            id: `window_auto_${i}`,
+            position: { x: snap(r.dimensions.x + r.dimensions.width / 2), y: snap(r.dimensions.y) },
+            width: 1.2,
+            height: 1.2,
+            type: 'sliding'
+          });
+        }
+      });
+    }
 
     // Compute bounds from rooms (fallback to walls)
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1120,7 +1167,7 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
     }
     if (minX === Infinity) { minX = 0; minY = 0; maxX = 10; maxY = 10; }
 
-    return {
+    const normalized = {
       ...plan,
       rooms,
       walls,
@@ -1128,6 +1175,18 @@ IMPORTANT: Return ONLY valid JSON matching the exact schema provided above. No a
       windows,
       bounds: { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
     };
+
+    // Fill basic metadata if missing
+    try {
+      const totalArea = rooms.reduce((acc: number, r: any) => acc + r.dimensions.width * r.dimensions.height, 0);
+      normalized.metadata = {
+        ...(plan.metadata || {}),
+        totalArea: snap(totalArea),
+        floors: plan.metadata?.floors || 1
+      };
+    } catch (_) {}
+
+    return normalized;
   };
 
   floorPlan = normalizePlan(floorPlan);
