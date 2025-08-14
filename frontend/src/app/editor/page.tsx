@@ -559,7 +559,7 @@ export default function EditorPage() {
       });
 
       if (res.ok) {
-        alert('✅ Project saved successfully!');
+        // Silently refresh projects list without popup
         loadProjects();
       }
     } catch (error) {
